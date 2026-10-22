@@ -1,0 +1,147 @@
+{
+  "schema": 1,
+  "observed_at_utc": "2026-10-22T22:30:08.231961+00:00",
+  "status": "physical-native-offline-workflow-passed",
+  "source_repository": "/Users/andreyyurlov/Documents/dev/fieldlog",
+  "source_revision": "a81e0853c4209e8de67b45e2157ac85215679455",
+  "source_clean_at_receipt": true,
+  "reviewer": "root integrator; separate from original native implementation agent",
+  "command": [
+    "xcodebuild",
+    "-project",
+    "ios/FieldLog.xcodeproj",
+    "-scheme",
+    "FieldLog",
+    "-configuration",
+    "Debug",
+    "-destination",
+    "platform=iOS,id=00008101-0004155214B9003A",
+    "-derivedDataPath",
+    "/Users/andreyyurlov/Documents/dev/mixer/verification/local/fieldlog-dark-physical-build",
+    "-resultBundlePath",
+    "/Users/andreyyurlov/Documents/dev/mixer/verification/local/fieldlog-dark-physical.xcresult",
+    "-disableAutomaticPackageResolution",
+    "CODE_SIGN_STYLE=Automatic",
+    "DEVELOPMENT_TEAM=RZY3NS8FM2",
+    "CODE_SIGN_IDENTITY=Apple Development",
+    "test"
+  ],
+  "exit_code": 0,
+  "summary": {
+    "devicesAndConfigurations": [
+      {
+        "device": {
+          "architecture": "arm64",
+          "deviceId": "00008101-0004155214B9003A",
+          "deviceName": "Andrey’s iPhone",
+          "modelName": "iPhone 12",
+          "osBuildNumber": "24A446",
+          "osVersion": "27.0.1",
+          "platform": "iOS"
+        },
+        "expectedFailures": 0,
+        "failedTests": 0,
+        "passedTests": 1,
+        "skippedTests": 0,
+        "testPlanConfiguration": {
+          "configurationId": "1",
+          "configurationName": "Test Scheme Action"
+        }
+      }
+    ],
+    "environmentDescription": "FieldLog · Built with macOS 27.0.1",
+    "expectedFailures": 0,
+    "failedTests": 0,
+    "finishTime": 1792707883.674,
+    "passedTests": 1,
+    "result": "Passed",
+    "runtimeWarnings": [],
+    "skippedTests": 0,
+    "startTime": 1792707805.328,
+    "statistics": [],
+    "testFailures": [],
+    "title": "Test - FieldLog",
+    "topInsights": [],
+    "totalTestCount": 1
+  },
+  "test_duration_seconds": 66.32,
+  "tools": {
+    "xcode": "Xcode 27.1\nBuild version 27A9275",
+    "swift": "Apple Swift version 6.4 (swiftlang-6.4.0.34.1 clang-2100.3.34.1)\nTarget: arm64-apple-macosx27.0.0"
+  },
+  "executable_sha256": "deb78b0381cea62250521495c95bd682b68472a3b36e3ae6a19a3c6a7f23264d",
+  "signing": "Cached existing development identity/profile; no provisioning portal mutation",
+  "dataset": "Fresh UUID-selected app-private UI test workspace, visible isolation badge asserted before mutation; synthetic records only",
+  "verified_behaviors": [
+    "Empty offline workspace",
+    "Project creation",
+    "Two tasks, toggle and explicit reorder",
+    "Exact draft restoration including newline and double space after process terminate/relaunch",
+    "Entry commit",
+    "Native report share-sheet preview and Copy availability; no external share destination selected",
+    "Explicit local pending changes not sent",
+    "Dark-mode draft controls visually inspected after adaptive accent correction"
+  ],
+  "visual_review": {
+    "image": "/Users/andreyyurlov/Documents/dev/mixer/verification/local/fieldlog-dark-physical-attachments/9BE1C847-E7BC-4CAB-AF4B-39B7B02749C8.png",
+    "result": "Done, category, photo and draft-state accent visible on dark surfaces",
+    "scope": "Visual inspection on iPhone12; no complete WCAG/VoiceOver/Dynamic Type matrix claim"
+  },
+  "attachments": [
+    {
+      "name": "05-local-pending-changes-not-sent_0_7F09C341-4FF3-4A4B-9677-6D84ECAB350A.png",
+      "local_path": "/Users/andreyyurlov/Documents/dev/mixer/verification/local/fieldlog-dark-physical-attachments/C72CD561-E213-469B-9CB9-1C35ACECD6F1.png",
+      "sha256": "18317c284f45f26a9eecb70419e81dd6cd63d24c17a7354fa8b7ced42715eb0f"
+    },
+    {
+      "name": "04-native-report-share-sheet_0_3FDE5494-8B44-4538-9FAA-C6DBD143F6DF.png",
+      "local_path": "/Users/andreyyurlov/Documents/dev/mixer/verification/local/fieldlog-dark-physical-attachments/9DB31522-C85A-4465-A071-E134B9544119.png",
+      "sha256": "79cfb9d4df470586207a159c62643845445256d08ff731bab7909145a127adaf"
+    },
+    {
+      "name": "03-restored-lossless-draft_0_60EA67DA-54D3-46AF-9FD3-501A99A421D3.png",
+      "local_path": "/Users/andreyyurlov/Documents/dev/mixer/verification/local/fieldlog-dark-physical-attachments/9BE1C847-E7BC-4CAB-AF4B-39B7B02749C8.png",
+      "sha256": "4c9a06a22851edcdd31127ee607b51fd47421a9c4884623b586584c40e262ae6"
+    },
+    {
+      "name": "02-checklist-completed-and-reordered_0_31B57DC3-520A-4B20-B96A-496B5BEEB145.png",
+      "local_path": "/Users/andreyyurlov/Documents/dev/mixer/verification/local/fieldlog-dark-physical-attachments/0828D2F9-DB6E-41B8-8776-3BA3D0C4F758.png",
+      "sha256": "7930c661840f17fcd94e1c37d7de9d7149aa7b04c8932d79b47bf868ef0f359d"
+    },
+    {
+      "name": "01-empty-offline-workspace_0_CDF18EFC-296A-4AF9-A8AA-FE5327BEAF7A.png",
+      "local_path": "/Users/andreyyurlov/Documents/dev/mixer/verification/local/fieldlog-dark-physical-attachments/2563DAF2-44CC-4657-B834-B2583C30DF1F.png",
+      "sha256": "a0a090c519fbdae6c4d272391401ca43d887e692c8a97f2d3a1e894c86d27f76"
+    }
+  ],
+  "artifacts": {
+    "result_bundle": "/Users/andreyyurlov/Documents/dev/mixer/verification/local/fieldlog-dark-physical.xcresult",
+    "result_bundle_tree_sha256": "b5e1bbeeedeb99628b93c0584ae14ff7bdfa22eca1fc5156b76954ab7f7d8c61",
+    "log": "/Users/andreyyurlov/Documents/dev/mixer/verification/local/fieldlog-dark-physical.log",
+    "log_sha256": "1ebdb699bd93f45481347498cf5718514d1cbd31097ec09e2180a77b302d7f41"
+  },
+  "prior_attempts": [
+    {
+      "revision": "32c063e748e48db391e878890edeb247a71d08d9",
+      "status": "device_gate",
+      "detail": "Two attempts stopped before test execution while UI automation passcode approval was pending. User unlocked iPhone and completed prompt."
+    },
+    {
+      "revision": "32c063e748e48db391e878890edeb247a71d08d9",
+      "status": "passed",
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "duration_seconds": 67.071,
+      "detail": "Workflow passed; screenshot review found static green accent too dark. Adaptive color fix retested in this receipt."
+    }
+  ],
+  "limitations": [
+    "Native app baseline only, not MixerSDK or guest mode",
+    "No authentication, backend sync, real users or store acceptance",
+    "Photo selection/camera, notification permissions, localization, accessibility and full OS/device matrix unqualified",
+    "Test duration is automation elapsed time, not app performance measurement",
+    "No physical power-loss or OS termination recovery qualification",
+    "D0-D8 and all GA gates remain open"
+  ]
+}
