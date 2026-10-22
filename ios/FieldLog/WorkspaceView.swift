@@ -101,6 +101,7 @@ private struct ProjectList: View {
             Text("Name a job or a site, then keep the details together as work happens.")
               .foregroundStyle(.secondary)
             Button("Create your first project", action: onAdd).buttonStyle(.borderedProminent)
+              .tint(FieldStyle.filledButton).foregroundStyle(.white)
               .accessibilityIdentifier("create-first-project")
           }.padding(.vertical, 16)
         }

@@ -20,6 +20,12 @@ import SwiftUI
 }
 
 enum FieldStyle {
-  static let green = Color(red: 0.14, green: 0.34, blue: 0.28)
+  // Text and system control tints need a lighter accent on dark surfaces.
+  static let green = Color(uiColor: UIColor { traits in
+    traits.userInterfaceStyle == .dark
+      ? UIColor(red: 0.48, green: 0.82, blue: 0.69, alpha: 1)
+      : UIColor(red: 0.14, green: 0.34, blue: 0.28, alpha: 1)
+  })
+  static let filledButton = Color(red: 0.14, green: 0.34, blue: 0.28)
   static let paper = Color(uiColor: .systemGroupedBackground)
 }
