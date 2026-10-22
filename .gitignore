@@ -1,8 +1,10 @@
 .build/
 .swiftpm/
 .DS_Store
-build/
+build*/
 *.xcuserstate
 xcuserdata/
 verification/*.png
 verification/*.log
+verification/*.xcresult/
+verification/local/

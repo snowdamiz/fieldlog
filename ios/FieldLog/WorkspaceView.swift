@@ -22,10 +22,12 @@ struct WorkspaceView: View {
       } else if let workspace = model.workspace {
         TabView {
           NavigationStack(path: $projectPath) {
-            ProjectList(workspace: workspace, onAdd: { addingProject = true })
-              .navigationDestination(for: UUID.self) { id in
-                ProjectDetail(projectID: id, onEdit: { editingDraft = $0 })
-              }
+            ProjectList(
+              workspace: workspace, testing: model.isTestWorkspace, onAdd: { addingProject = true }
+            )
+            .navigationDestination(for: UUID.self) { id in
+              ProjectDetail(projectID: id, onEdit: { editingDraft = $0 })
+            }
           }.tabItem { Label("Projects", systemImage: "square.stack.3d.up") }
           NavigationStack {
             DeviceQueue(
@@ -71,6 +73,7 @@ struct WorkspaceView: View {
 
 private struct ProjectList: View {
   let workspace: Workspace
+  let testing: Bool
   let onAdd: () -> Void
   @State private var search = ""
   var body: some View {
@@ -80,6 +83,10 @@ private struct ProjectList: View {
           Label("OFFLINE WORKSPACE", systemImage: "circle.inset.filled").font(
             .caption.weight(.semibold)
           ).foregroundStyle(FieldStyle.green)
+          if testing {
+            Text("Isolated test workspace").font(.caption).foregroundStyle(.secondary)
+              .accessibilityIdentifier("test-workspace-badge")
+          }
           Text("A clear record\nof the work.").font(.largeTitle.weight(.semibold))
           Text("Projects, checklists and field notes. Saved on this device.").font(.subheadline)
             .foregroundStyle(.secondary)

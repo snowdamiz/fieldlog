@@ -1,0 +1,135 @@
+{
+  "schema": 1,
+  "date": "2026-10-22",
+  "agent": {
+    "model": "gpt-6.1-sol",
+    "reasoning_effort": "xhigh"
+  },
+  "source_identity": "Commit containing this receipt",
+  "source_tree_sha256": "394c95953250f803c0ebb3acd0f177fd2ff985f4c81ec31b4a4e93ba64190c07",
+  "source_tree_algorithm": "Sorted repository-relative Sources,Tests,ios,scripts files plus .gitignore,Package.swift,README.md,AGENTS.md,THIRD_PARTY.yml; each path NUL lowercase-file-SHA256 LF. Excludes xcuserdata and verification artifacts.",
+  "tools": {
+    "swift": "Apple Swift6.4 swiftlang-6.4.0.34.1",
+    "xcode": "27.1 27A9275",
+    "sdk": "iPhoneSimulator27.1"
+  },
+  "command": "xcodebuild -project ios/FieldLog.xcodeproj -scheme FieldLog -configuration Debug -destination 'platform=iOS Simulator,id=463F0C3C-63BC-42C4-A17C-0908C07D341D' -derivedDataPath /tmp/fieldlog-native-ui-derived-20261022 -resultBundlePath /tmp/fieldlog-native-ui-simulator-r5.xcresult -disableAutomaticPackageResolution CODE_SIGNING_ALLOWED=NO test",
+  "exit_code": 0,
+  "test_duration_seconds": 57.713,
+  "summary": {
+    "devicesAndConfigurations": [
+      {
+        "device": {
+          "architecture": "arm64",
+          "deviceId": "463F0C3C-63BC-42C4-A17C-0908C07D341D",
+          "deviceName": "Mixer Qualification iPhone",
+          "modelName": "iPhone 17 Pro",
+          "osBuildNumber": "23F77",
+          "osVersion": "26.5",
+          "platform": "iOS Simulator"
+        },
+        "expectedFailures": 0,
+        "failedTests": 0,
+        "passedTests": 1,
+        "skippedTests": 0,
+        "testPlanConfiguration": {
+          "configurationId": "1",
+          "configurationName": "Test Scheme Action"
+        }
+      }
+    ],
+    "environmentDescription": "FieldLog \u00b7 Built with macOS 27.0.1",
+    "expectedFailures": 0,
+    "failedTests": 0,
+    "finishTime": 1792707236.504,
+    "passedTests": 1,
+    "result": "Passed",
+    "runtimeWarnings": [],
+    "skippedTests": 0,
+    "startTime": 1792707169.01,
+    "statistics": [],
+    "testFailures": [],
+    "title": "Test - FieldLog",
+    "topInsights": [],
+    "totalTestCount": 1
+  },
+  "result_bundle": "/tmp/fieldlog-native-ui-simulator-r5.xcresult",
+  "result_bundle_tree_sha256": "8a26c8c619380572b34ad8a05af948567a8ab4ea5563366eb16ac99877b236d1",
+  "log": "/tmp/fieldlog-native-ui-test-r5.log",
+  "log_sha256": "559285ada4dcbc9b52ab5a1971b995d168a0b5b1354e75bb9d90ea21dc2bce29",
+  "dataset": "Fresh UUID-selected FieldLogUITest-* app-private directory, asserted by visible isolated-workspace badge before mutation; entirely synthetic records created through native UI. Real/ordinary workspace excluded.",
+  "expectations": [
+    "Empty explicit offline workspace",
+    "Create project through native form",
+    "Add two tasks, complete one, reorder through visible Task options menu",
+    "Persist typed draft, terminate/relaunch app, restore project and exact note including newline and double space",
+    "Commit one entry",
+    "Generate actual local text report and inspect native share-sheet report preview; no external share destination selected",
+    "Open On device and verify explicit not-sent state"
+  ],
+  "attachments": [
+    {
+      "name": "05-local-pending-changes-not-sent_0_E1CD7498-4708-4D48-9354-1C037F4E7593.png",
+      "path": "/Users/andreyyurlov/Documents/dev/fieldlog/verification/local/ui-attachments/1ED7E31A-26FB-40C2-9738-396ED8F12FAD.png",
+      "sha256": "f85142e637defd237801badab388749f9e934377082ed24557997de1196435de",
+      "failure_attachment": false
+    },
+    {
+      "name": "04-native-report-share-sheet_0_690EF5BE-CFE5-4E43-B1BD-F423CCC0F981.png",
+      "path": "/Users/andreyyurlov/Documents/dev/fieldlog/verification/local/ui-attachments/0FAD2DAC-F761-4794-A7E3-AD811B4BE668.png",
+      "sha256": "52f30226844b64f42268b75b4ddc2c1adda1577bf1bc9b27bd128ae2b457834c",
+      "failure_attachment": false
+    },
+    {
+      "name": "03-restored-lossless-draft_0_B59494A1-3EC3-47FA-A521-D7FC3B95464E.png",
+      "path": "/Users/andreyyurlov/Documents/dev/fieldlog/verification/local/ui-attachments/AC77E5A8-6887-4A21-8E4C-971CAFBCED91.png",
+      "sha256": "b08371e0986463e16ab165e2dd663c622e65d9a6a3dbc7add02c20463ce4dcc7",
+      "failure_attachment": false
+    },
+    {
+      "name": "02-checklist-completed-and-reordered_0_3FE75BA2-A5BF-41CD-8AA0-27DB3F94B497.png",
+      "path": "/Users/andreyyurlov/Documents/dev/fieldlog/verification/local/ui-attachments/C4A27B3D-9756-4F3E-B023-06A2821EFA01.png",
+      "sha256": "f4194cbaba4eafb00361ab51b461d2e0cb5fc795a12d3b9d915dc16a3ae77173",
+      "failure_attachment": false
+    },
+    {
+      "name": "01-empty-offline-workspace_0_02C148FD-AA7B-4022-97F2-06BFE23DBB1C.png",
+      "path": "/Users/andreyyurlov/Documents/dev/fieldlog/verification/local/ui-attachments/165DE475-A6F3-4274-8773-BB9B5B52A9AA.png",
+      "sha256": "ffa8f416235cf8e431920e4666e71a2bd0ae4d18c8779c127ab89856ec610022",
+      "failure_attachment": false
+    }
+  ],
+  "unit_tests": {
+    "command": "swift test",
+    "exit_code": 0,
+    "passed": 13,
+    "additional_regression": "Text autosave cannot erase concurrently imported photo references"
+  },
+  "prior_attempts": [
+    {
+      "run": "r1",
+      "status": "failed_build",
+      "reason": "Debug app linked inactive x86_64 against active-arm64 Swift-package objects; set standard ONLY_ACTIVE_ARCH Debug configuration."
+    },
+    {
+      "run": "r2",
+      "status": "failed_test",
+      "reason": "Drag reorder expectation failed; missing DEBUG compilation flag also exposed test folder guard issue. Exact four-operation synthetic dataset in previously empty normal simulator workspace was archived and restored under lock after checking sole project/task identities and absence of entries/drafts/photos. No real or physical records were touched."
+    },
+    {
+      "run": "r3",
+      "status": "stopped",
+      "reason": "Native long-press context preview did not report animation idle; replaced hidden gesture-only access with visible Task options menu while preserving native drag support."
+    },
+    {
+      "run": "r4",
+      "status": "failed_assertion",
+      "reason": "Actual report/share workflow reached native share sheet; Copy was exposed as Cell rather than Button. Assertion now checks real ActivityListView, report filename preview and label across element types."
+    }
+  ],
+  "physical_device": "Not exercised by this delegate; root/integrator separately owns signed physical run and receipt.",
+  "D0": {
+    "status": "blocked",
+    "reason": "This is synthetic simulator workflow evidence, not authentication, real-user work, physical recording/timing, store approval or published-SDK consumer qualification."
+  }
+}

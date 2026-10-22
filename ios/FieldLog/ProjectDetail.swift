@@ -32,23 +32,47 @@ struct ProjectDetail: View {
           }
           Section {
             ForEach(workspace.tasks(for: projectID)) { task in
-              Button {
-                model.toggleTask(task.id)
-              } label: {
-                HStack(alignment: .top, spacing: 12) {
-                  Image(systemName: task.completed ? "checkmark.circle.fill" : "circle").font(
-                    .title3
-                  ).foregroundStyle(task.completed ? FieldStyle.green : Color.secondary)
-                  VStack(alignment: .leading, spacing: 4) {
-                    Text(task.title).foregroundStyle(.primary).strikethrough(task.completed)
-                    if !task.responsible.isEmpty {
-                      Text(task.responsible).font(.caption).foregroundStyle(.secondary)
+              HStack(alignment: .top) {
+                Button {
+                  model.toggleTask(task.id)
+                } label: {
+                  HStack(alignment: .top, spacing: 12) {
+                    Image(systemName: task.completed ? "checkmark.circle.fill" : "circle").font(
+                      .title3
+                    ).foregroundStyle(task.completed ? FieldStyle.green : Color.secondary)
+                    VStack(alignment: .leading, spacing: 4) {
+                      Text(task.title).foregroundStyle(.primary).strikethrough(task.completed)
+                      if !task.responsible.isEmpty {
+                        Text(task.responsible).font(.caption).foregroundStyle(.secondary)
+                      }
                     }
+                  }.padding(.vertical, 3)
+                }.buttonStyle(.plain).accessibilityLabel(
+                  "\(task.title), \(task.completed ? "completed":"not completed")"
+                ).accessibilityHint("Double tap to \(task.completed ? "reopen":"complete") task")
+                  .frame(maxWidth: .infinity, alignment: .leading)
+                if workspace.tasks(for: projectID).count > 1 {
+                  Menu {
+                    if let index = workspace.tasks(for: projectID).firstIndex(where: {
+                      $0.id == task.id
+                    }) {
+                      if index > 0 {
+                        Button("Move up", systemImage: "arrow.up") {
+                          model.moveTask(task.id, offset: -1)
+                        }
+                      }
+                      if index < workspace.tasks(for: projectID).count - 1 {
+                        Button("Move down", systemImage: "arrow.down") {
+                          model.moveTask(task.id, offset: 1)
+                        }
+                      }
+                    }
+                  } label: {
+                    Image(systemName: "ellipsis.circle").font(.title3)
                   }
-                }.padding(.vertical, 3)
-              }.buttonStyle(.plain).accessibilityLabel(
-                "\(task.title), \(task.completed ? "completed":"not completed")"
-              ).accessibilityHint("Double tap to \(task.completed ? "reopen":"complete") task")
+                  .accessibilityLabel("Task options: \(task.title)")
+                }
+              }
             }
             .onMove { source, destination in
               var tasks = workspace.tasks(for: projectID)

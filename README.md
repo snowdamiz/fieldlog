@@ -41,6 +41,28 @@ provisioning, store approval and public licensing are separate decisions. No
 credentials or signing keys are committed. A physically signed build is produced
 only with an explicitly selected local identity/profile outside the source.
 
+`FieldLogUITests` exercises the visible empty → project → checklist → saved
+draft → relaunch → entry → native report/share → pending-local-changes workflow.
+It supplies a random UUID with `--fieldlog-ui-workspace`, requires a visible
+isolated-workspace badge before making changes, and never sends a report or
+signs in. The argument selects a separate app-private folder only in Debug;
+Release refuses it before opening any workspace. Screenshot attachments remain
+in the xcresult. The app's ordinary workspace is never the intended test dataset.
+
+```sh
+xcodebuild -project ios/FieldLog.xcodeproj -scheme FieldLog \
+  -configuration Debug -destination 'platform=iOS Simulator,id=SIMULATOR_UUID' \
+  -derivedDataPath /tmp/fieldlog-ui-build \
+  -resultBundlePath /tmp/fieldlog-ui.xcresult \
+  -disableAutomaticPackageResolution CODE_SIGNING_ALLOWED=NO test
+```
+
+Keep build/results/log outputs outside the package directory for this UI-test
+command. Editing package sources or generating artifacts under its root during
+an Xcode test session can trigger repeated package graph resolution. Physical
+test execution uses the same target and a locally selected development team;
+it still does not establish real-user, authentication or store qualification.
+
 This is D0 groundwork, **not a passed D0 milestone**. Login/auth, a production
 backend, team synchronization/conflicts, camera capture, maps, push, purchases,
 real users/records, physical-device recordings/timings and store distributions

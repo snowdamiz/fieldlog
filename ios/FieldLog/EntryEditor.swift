@@ -65,6 +65,7 @@ struct EntryEditor: View {
           ).accessibilityIdentifier("save-entry")
         }
       }
+      .scrollDismissesKeyboard(.interactively)
       .navigationTitle("Field note").navigationBarTitleDisplayMode(.inline)
       .toolbar {
         ToolbarItem(placement: .confirmationAction) {

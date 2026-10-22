@@ -9,6 +9,7 @@ import SwiftUI
   @Published private(set) var saveError: String?
   @Published private(set) var pendingSaves = 0
   @Published private(set) var unsavedDrafts: [UUID: EntryDraft] = [:]
+  @Published private(set) var isTestWorkspace = false
   private var repository: WorkspaceRepository?
   private var saveChain: Task<Bool, Never>?
   private var opened = false
@@ -20,8 +21,25 @@ import SwiftUI
     do {
       let support = try FileManager.default.url(
         for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
+      var workspaceFolder = "FieldLog"
+      let arguments = ProcessInfo.processInfo.arguments
+      if let index = arguments.firstIndex(of: "--fieldlog-ui-workspace") {
+        #if DEBUG
+          guard arguments.indices.contains(index + 1),
+            let identity = UUID(uuidString: arguments[index + 1])
+          else {
+            throw FieldLogError.validation(
+              "A valid dedicated UI-test workspace identifier is required.")
+          }
+          workspaceFolder = "FieldLogUITest-" + identity.uuidString.lowercased()
+          isTestWorkspace = true
+        #else
+          throw FieldLogError.validation(
+            "UI-test workspaces require a Debug build. No workspace was opened.")
+        #endif
+      }
       let repository = try WorkspaceRepository(
-        directory: support.appendingPathComponent("FieldLog", isDirectory: true))
+        directory: support.appendingPathComponent(workspaceFolder, isDirectory: true))
       self.repository = repository
       workspace = await repository.snapshot()
       openError = nil
@@ -72,6 +90,19 @@ import SwiftUI
   func toggleTask(_ id: UUID) { enqueue { try $0.toggleTask(id) } }
   func reorder(projectID: UUID, ids: [UUID]) {
     enqueue { try $0.reorderTasks(projectID: projectID, ids: ids) }
+  }
+  func moveTask(_ id: UUID, offset: Int) {
+    enqueue { state in
+      guard let task = state.tasks.first(where: { $0.id == id }) else {
+        throw FieldLogError.missingRecord
+      }
+      var ids = state.tasks(for: task.projectID).map(\.id)
+      guard let index = ids.firstIndex(of: id), ids.indices.contains(index + offset) else {
+        throw FieldLogError.validation("This task cannot move farther.")
+      }
+      ids.swapAt(index, index + offset)
+      try state.reorderTasks(projectID: task.projectID, ids: ids)
+    }
   }
   func restoreProject(_ id: UUID?) {
     guard workspace?.restoration.selectedProjectID != id else { return }

@@ -238,3 +238,25 @@ private func mutate(_ workspace: inout Workspace, _ body: (inout Workspace) thro
   #expect(report.contains("local records only"))
   #expect(!report.contains("Uploaded"))
 }
+
+@Test func textAutosaveCannotEraseAConcurrentlyImportedPhoto() async throws {
+  let root = try folder()
+  defer { try? FileManager.default.removeItem(at: root) }
+  let store = try WorkspaceRepository(directory: root)
+  let state = try await store.transact { try $0.createProject(title: "Photo text race", site: "") }
+  let project = try #require(state.projects.first?.id)
+  let earlier = EntryDraft(projectID: project, title: "Observation", note: "Before photo")
+  _ = try await store.transact { try $0.saveDraft(earlier) }
+  let imported = try await store.addPhoto(jpeg: Data([0xff, 0xd8, 0xff, 0x01]), to: earlier.id)
+  let photo = try #require(imported.attachments.first?.id)
+  var changed = earlier
+  changed.note = "Typed while the photo import completed"
+  let latest = changed
+  let saved = try await store.transact {
+    try $0.saveDraft(latest)
+    try $0.commitDraft(latest.id)
+  }
+  #expect(saved.entries[0].note == latest.note)
+  #expect(saved.entries[0].attachmentIDs == [photo])
+  await store.close()
+}
