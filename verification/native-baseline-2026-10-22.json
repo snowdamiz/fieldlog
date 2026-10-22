@@ -1,0 +1,21 @@
+{
+  "schema":1,
+  "date":"2026-10-22",
+  "repository":"/Users/andreyyurlov/Documents/dev/fieldlog",
+  "source_identity":"Commit containing this receipt; immutable exact revision recorded by Mixer integration evidence",
+  "model":{"selected":"gpt-6.1-sol","reasoning_effort":"xhigh","context":"fresh bounded delegate"},
+  "tools":{"swift":"Apple Swift6.4 swiftlang-6.4.0.34.1 clang-2100.3.34.1","xcode":"27.1 27A9275","build_sdk":"iphonesimulator27.1","host":"macOS arm64"},
+  "app":{"bundle_id":"dev.mixer.fieldlog","version":"0.1.0","build":1,"mode":"ordinary native SwiftUI offline baseline","mixer_sdk_dependency":false},
+  "commands":[
+    {"command":"swift test","exit_code":0,"result":"12 Swift Testing model/storage tests passed; no user data or network success fabricated","log":"verification/swift-test.log"},
+    {"command":"xcodebuild -project ios/FieldLog.xcodeproj -scheme FieldLog -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath build CODE_SIGNING_ALLOWED=NO build","exit_code":0,"result":"Unsigned native iOS Simulator app built; no Swift source warnings after photo-picker Sendable label fix","log":"verification/ios-build.log"},
+    {"command":"xcrun simctl install 463F0C3C-63BC-42C4-A17C-0908C07D341D build/Build/Products/Debug-iphonesimulator/FieldLog.app","exit_code":0,"result":"Installed on Mixer Qualification iPhone simulator, iOS26.5 build23F77"},
+    {"command":"xcrun simctl launch 463F0C3C-63BC-42C4-A17C-0908C07D341D dev.mixer.fieldlog","exit_code":0,"result":"Native app process launched"},
+    {"command":"xcrun simctl io 463F0C3C-63BC-42C4-A17C-0908C07D341D screenshot verification/simulator-initial.png","exit_code":0,"result":"Screenshot visually inspected: explicit offline empty workspace, create-project action, project search, On device and Settings tabs; no fabricated activity"}
+  ],
+  "tests_scope":["Empty real workspace", "Input validation, search, exact task progress and reorder identity", "Unicode/whitespace/date draft preservation and duplicate commit rejection", "Persistent restart with stable outbox identities", "Stale revision and external overwrite protection", "20 concurrent mutations without lost updates", "Before write/fsync/rename and after rename/directory-sync injected storage failures", "Corrupt or unsupported workspace preservation", "Private bounded photo references and path traversal rejection", "Actual local report content and scope disclosure"],
+  "dataset":"Originally authored temporary test projects and payloads only; the launched normal app workspace starts empty",
+  "D0":{"status":"blocked","reason":"Baseline source and local tests exist; actual login/auth, physical-device recording, baseline timing samples, meaningful saved real-user records and signed-device build evidence are not established by this receipt"},
+  "not_verified":["Photo-picker interaction on device", "Camera capture", "Backend/auth/session lifecycle", "Remote sync, retry or conflict resolution", "User recruitment or weekly activity", "APNs/FCM, maps, purchases", "Published SDK/CLI consumer adoption", "Android", "Interpreted/OTA release", "Store review/distribution", "Hosted CI"],
+  "reviewer":"implementation delegate; independent acceptance remains required"
+}
