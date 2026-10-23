@@ -1,0 +1,49 @@
+Building for debugging...
+[Pre-planning 1 / 241]
+[Planning deferred tasks]
+[6 / 17] FieldLogTests-product
+[8 / 19] FieldLogTests-product
+[12 / 18] FieldLogTests-product
+[14 / 18] FieldLogTests-product
+Build complete! (1.41 sec)
+Test Suite 'All tests' started at 2026-10-22 20:58:29.258.
+Test Suite 'All tests' passed at 2026-10-22 20:58:29.259.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.001) seconds
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Test corruptOrUnknownSchemaIsNeverReset() started.
+◇ Test staleAndInvalidMutationsLeaveStateIntact() started.
+◇ Test taskEditorAdmitsOneSaveAndRetainsFailedInputForRetry() started.
+◇ Test externalSnapshotReplacementCannotBeOverwritten() started.
+◇ Test validationAndReorderCannotLoseTasks() started.
+◇ Test projectsSearchAndTaskProgressUseRealDenominator() started.
+◇ Test emptyWorkspaceNeverFabricatesActivity() started.
+◇ Test publishedMixerTaskFeatureCommitsThroughExistingRepositoryAndReopens() started.
+◇ Test commitFaultsReopenPreviousOrCompleteNextState() started.
+◇ Test taskEditorPreservesTextAndRejectsInvalidSubmission() started.
+◇ Test photoReferencesArePrivateBoundedAndDurable() started.
+◇ Test concurrentOperationsDoNotOverwriteOneAnother() started.
+◇ Test textAutosaveCannotEraseAConcurrentlyImportedPhoto() started.
+◇ Test draftWhitespaceDatesAndIdentitySurviveCommit() started.
+◇ Test offlineDraftReopensAndQueuedChangesRemainUnsent() started.
+◇ Test taskEditorClosedOwnerCannotReceiveLateSaveSuccess() started.
+◇ Test reportSharesActualRecordsAndDisclosesLocalScope() started.
+✔ Test emptyWorkspaceNeverFabricatesActivity() passed after 0.001 seconds.
+✔ Test draftWhitespaceDatesAndIdentitySurviveCommit() passed after 0.001 seconds.
+✔ Test validationAndReorderCannotLoseTasks() passed after 0.001 seconds.
+✔ Test reportSharesActualRecordsAndDisclosesLocalScope() passed after 0.002 seconds.
+✔ Test taskEditorPreservesTextAndRejectsInvalidSubmission() passed after 0.002 seconds.
+✔ Test projectsSearchAndTaskProgressUseRealDenominator() passed after 0.003 seconds.
+✔ Test taskEditorClosedOwnerCannotReceiveLateSaveSuccess() passed after 0.003 seconds.
+✔ Test taskEditorAdmitsOneSaveAndRetainsFailedInputForRetry() passed after 0.003 seconds.
+✔ Test externalSnapshotReplacementCannotBeOverwritten() passed after 0.004 seconds.
+✔ Test staleAndInvalidMutationsLeaveStateIntact() passed after 0.006 seconds.
+✔ Test corruptOrUnknownSchemaIsNeverReset() passed after 0.006 seconds.
+✔ Test offlineDraftReopensAndQueuedChangesRemainUnsent() passed after 0.007 seconds.
+✔ Test publishedMixerTaskFeatureCommitsThroughExistingRepositoryAndReopens() passed after 0.007 seconds.
+✔ Test photoReferencesArePrivateBoundedAndDurable() passed after 0.009 seconds.
+✔ Test textAutosaveCannotEraseAConcurrentlyImportedPhoto() passed after 0.010 seconds.
+✔ Test commitFaultsReopenPreviousOrCompleteNextState() passed after 0.014 seconds.
+✔ Test concurrentOperationsDoNotOverwriteOneAnother() passed after 0.020 seconds.
+✔ Test run with 17 tests in 0 suites passed after 0.021 seconds.

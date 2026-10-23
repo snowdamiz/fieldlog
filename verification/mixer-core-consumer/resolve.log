@@ -1,0 +1,17 @@
+Command line invocation:
+    /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild -resolvePackageDependencies -project ios/FieldLog.xcodeproj -scheme FieldLog -clonedSourcePackagesDirPath /Users/andreyyurlov/Documents/dev/mixer/verification/local/fieldlog-public-sdk-packages
+
+Resolve Package Graph
+
+Fetching from https://github.com/snowdamiz/mixer.git (cached)
+
+Creating working copy of package ‘mixer’
+
+Checking out d8c6965a277ca21e685f3ef9e0f68a7d59b46156 of package ‘mixer’
+
+
+Resolved source packages:
+  Mixer: https://github.com/snowdamiz/mixer.git @ d8c6965
+  FieldLog: /Users/andreyyurlov/Documents/dev/fieldlog @ local
+
+resolved source packages: Mixer, FieldLog

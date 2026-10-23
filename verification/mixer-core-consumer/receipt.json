@@ -1,0 +1,158 @@
+{
+  "schema": 1,
+  "createdAt": "2026-10-23T01:03:26.152746+00:00",
+  "status": "initial public MixerCore consumer qualified on host and iOS simulator; no full dogfood gate passed",
+  "fieldlogRevision": "d51adf50de7e20549e87062e4569609342cdfe25",
+  "fieldlogRepository": "/Users/andreyyurlov/Documents/dev/fieldlog",
+  "mixerDependency": {
+    "url": "https://github.com/snowdamiz/mixer.git",
+    "revision": "d8c6965a277ca21e685f3ef9e0f68a7d59b46156",
+    "product": "MixerCore",
+    "consumerTarget": "FieldLogFeatures",
+    "pinKind": "remoteSourceControl full revision, locked independently by SwiftPM and Xcode",
+    "resolvedCheckoutRevisionsVerified": true,
+    "localMixerPathOverride": false,
+    "engineInternalImports": false
+  },
+  "sourceFiles": [
+    {
+      "path": "Package.swift",
+      "sha256": "1973991a7d948bf04287fee7b6f3bd27a641797cb209794b3374de9bb08e8fd9"
+    },
+    {
+      "path": "Package.resolved",
+      "sha256": "42ad8be64335daf00cef4aa4c5a204cb7f54981af6260a15cca1cc9bb8f947e2"
+    },
+    {
+      "path": "Sources/FieldLogFeatures/TaskEditor.swift",
+      "sha256": "ef5321a92467868227007b856aca5c7ed142e5337d8dbb20a07e0e3394335310"
+    },
+    {
+      "path": "Tests/FieldLogTests/TaskEditorTests.swift",
+      "sha256": "d5a681a17115bd020638249e32d1b250538021d6c71c9e43572ba9d2b7f6549f"
+    },
+    {
+      "path": "ios/FieldLog/ProjectDetail.swift",
+      "sha256": "7323edc388887af50c332f7e196177787b6eac313cb4b91f650797a88ca6975d"
+    },
+    {
+      "path": "ios/FieldLog.xcodeproj/project.pbxproj",
+      "sha256": "8d4509087be0c53925e49eab63d53c3105aad0147d17d90822c3f71a63ae459f"
+    },
+    {
+      "path": "ios/FieldLog.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved",
+      "sha256": "51cef728c75f865714465ac61322481e86524ed64e7c09b628bd1507a4778f2f"
+    },
+    {
+      "path": "ios/FieldLogUITests/FieldLogUITests.swift",
+      "sha256": "081acd533b8a709e1f16331c0149cc2ea3e8a86ced86998444692e37fc497d38"
+    }
+  ],
+  "commands": [
+    {
+      "command": "swift package resolve",
+      "cwd": "/Users/andreyyurlov/Documents/dev/fieldlog",
+      "exitCode": 0,
+      "observed": "Fetched public remote and resolved exact d8c6965 commit."
+    },
+    {
+      "command": "swift test",
+      "cwd": "/Users/andreyyurlov/Documents/dev/fieldlog",
+      "exitCode": 0,
+      "functions": 17,
+      "failures": 0,
+      "output": "host-tests.log"
+    },
+    {
+      "command": "xcodebuild -resolvePackageDependencies -project ios/FieldLog.xcodeproj -scheme FieldLog -clonedSourcePackagesDirPath /Users/andreyyurlov/Documents/dev/mixer/verification/local/fieldlog-public-sdk-packages",
+      "cwd": "/Users/andreyyurlov/Documents/dev/fieldlog",
+      "exitCode": 0,
+      "output": "resolve.log"
+    },
+    {
+      "command": "xcodebuild -project ios/FieldLog.xcodeproj -scheme FieldLog -configuration Debug -destination 'platform=iOS Simulator,id=463F0C3C-63BC-42C4-A17C-0908C07D341D' -derivedDataPath /Users/andreyyurlov/Documents/dev/mixer/verification/local/fieldlog-public-sdk-build -clonedSourcePackagesDirPath /Users/andreyyurlov/Documents/dev/mixer/verification/local/fieldlog-public-sdk-packages -resultBundlePath /Users/andreyyurlov/Documents/dev/mixer/verification/local/fieldlog-public-sdk.xcresult -disableAutomaticPackageResolution CODE_SIGNING_ALLOWED=NO test",
+      "cwd": "/Users/andreyyurlov/Documents/dev/fieldlog",
+      "exitCode": 0,
+      "tests": 1,
+      "failures": 0,
+      "skips": 0,
+      "testSeconds": 60.182,
+      "runtimeWarnings": 0,
+      "output": "simulator-ui.log",
+      "summary": "simulator-summary.json"
+    }
+  ],
+  "tools": {
+    "xcode": "27.1 (27A9275)",
+    "swift": "Apple Swift6.4 swiftlang-6.4.0.34.1",
+    "simulator": "iPhone17 Pro / iOS26.5 build23F77 arm64"
+  },
+  "observations": [
+    "Existing native task form uses public Mixer feature state and save-effect ownership. Invalid form input and duplicate save admission are rejected; failed input is retained; a closed owner rejects late effect results.",
+    "Host integration commits through original serialized repository and reopens identical persisted state. Models/storage schema are unchanged.",
+    "Unmodified isolated-workspace UI test creates project and two tasks through native input, toggles/reorders, restores exact multiline double-space draft across app terminate/relaunch, commits entry, opens report share preview and checks explicitly unsent local queue.",
+    "Visually inspected checklist and restored draft screenshots: expected native controls, ordering, completion and text are visible.",
+    "Two AppIntents metadata extraction skipped build warnings; no test runtime warning."
+  ],
+  "evidenceFiles": [
+    {
+      "path": "attachments.json",
+      "bytes": 2852,
+      "sha256": "58ea5dac336fda01f17da00a7072e06df9b2ebb104e4d2ed032755a204f4be7c"
+    },
+    {
+      "path": "host-tests.log",
+      "bytes": 3195,
+      "sha256": "9065d594144b25010c6eaf653a0097a56edbc85d556400f90e65969dd45e4230"
+    },
+    {
+      "path": "resolve.log",
+      "bytes": 687,
+      "sha256": "5f8107024feaf9fcc3ba90f93bbf628f146bc8c57d9276569a4069c244cbad97"
+    },
+    {
+      "path": "screenshots/01-empty-offline-workspace.png",
+      "bytes": 230761,
+      "sha256": "3dd30bb01633d0734a79b7b5d43440684323eb88075de3d8fd94e6260ee620c7"
+    },
+    {
+      "path": "screenshots/02-checklist-completed-and-reordered.png",
+      "bytes": 223714,
+      "sha256": "023b5ae4d4acc9bbd4e58562e4a08dc7f79c38a00058eb0fb9f3448add9f9668"
+    },
+    {
+      "path": "screenshots/03-restored-lossless-draft.png",
+      "bytes": 217983,
+      "sha256": "cf6424a7deb4ac9afc36a8e901463c126ea234da304db072e5449b166730f88b"
+    },
+    {
+      "path": "screenshots/04-native-report-share-sheet.png",
+      "bytes": 411929,
+      "sha256": "a05a7186f32a81e1098ddefe2b236b7486ffade4a32691afa012fccf2040336c"
+    },
+    {
+      "path": "screenshots/05-local-pending-changes-not-sent.png",
+      "bytes": 321749,
+      "sha256": "dc75805d35012b3b6619483dd28fb29604627bdb82be146ef4c1ebb060f85a3f"
+    },
+    {
+      "path": "simulator-summary.json",
+      "bytes": 1010,
+      "sha256": "aba37d7edc0029eadc8b274fec2195f0b7927060a6d1c9681a3ab69f091156f8"
+    },
+    {
+      "path": "simulator-ui.log",
+      "bytes": 315204,
+      "sha256": "51cd0eb102f959e29a0a7b64dec8fc4065401d583fc6b36de9a03176957edc6a"
+    }
+  ],
+  "limitations": [
+    "Native MixerCore feature adoption only; screen rendering remains native SwiftUI, without MixerUI/guest/capability/OTA migration.",
+    "No physical device run; phones unavailable.",
+    "No actual photo capture/upload, account authentication, server sync, real customer activity, performance or store qualification.",
+    "FieldLog source is committed in its separate local repository; no remote FieldLog repository or push is claimed.",
+    "No D0-D8 or GA acceptance; no stable Mixer API/release tag guarantee."
+  ],
+  "externalMessagesSent": false,
+  "physicalDevices": false
+}

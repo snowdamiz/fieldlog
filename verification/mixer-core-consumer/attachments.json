@@ -1,0 +1,58 @@
+[
+  {
+    "attachments": [
+      {
+        "configurationName": "Test Scheme Action",
+        "deviceId": "463F0C3C-63BC-42C4-A17C-0908C07D341D",
+        "deviceName": "Mixer Qualification iPhone",
+        "exportedFileName": "FCD70D38-76A7-49D4-BF65-79808DAB7260.png",
+        "isAssociatedWithFailure": false,
+        "suggestedHumanReadableName": "05-local-pending-changes-not-sent_0_136B0143-5934-4BF8-9B17-52A975C32FC6.png",
+        "timestamp": 1792717222.969,
+        "path": "screenshots/05-local-pending-changes-not-sent.png"
+      },
+      {
+        "configurationName": "Test Scheme Action",
+        "deviceId": "463F0C3C-63BC-42C4-A17C-0908C07D341D",
+        "deviceName": "Mixer Qualification iPhone",
+        "exportedFileName": "8C315ACC-1260-400E-A520-A3F213DA84F3.png",
+        "isAssociatedWithFailure": false,
+        "suggestedHumanReadableName": "04-native-report-share-sheet_0_C9382A35-72B2-48B9-924F-123DB37ACF5D.png",
+        "timestamp": 1792717219.145,
+        "path": "screenshots/04-native-report-share-sheet.png"
+      },
+      {
+        "configurationName": "Test Scheme Action",
+        "deviceId": "463F0C3C-63BC-42C4-A17C-0908C07D341D",
+        "deviceName": "Mixer Qualification iPhone",
+        "exportedFileName": "B3B9AE59-E44D-40E2-A309-55FB5230AF82.png",
+        "isAssociatedWithFailure": false,
+        "suggestedHumanReadableName": "03-restored-lossless-draft_0_F4CA15C5-0967-41D4-9067-C20686D64576.png",
+        "timestamp": 1792717208.795,
+        "path": "screenshots/03-restored-lossless-draft.png"
+      },
+      {
+        "configurationName": "Test Scheme Action",
+        "deviceId": "463F0C3C-63BC-42C4-A17C-0908C07D341D",
+        "deviceName": "Mixer Qualification iPhone",
+        "exportedFileName": "4511C1C9-B71D-4339-8BA7-7A120E190F9B.png",
+        "isAssociatedWithFailure": false,
+        "suggestedHumanReadableName": "02-checklist-completed-and-reordered_0_820241A0-4EFE-44A8-95BA-35197A1AC319.png",
+        "timestamp": 1792717195.583,
+        "path": "screenshots/02-checklist-completed-and-reordered.png"
+      },
+      {
+        "configurationName": "Test Scheme Action",
+        "deviceId": "463F0C3C-63BC-42C4-A17C-0908C07D341D",
+        "deviceName": "Mixer Qualification iPhone",
+        "exportedFileName": "BC05E4A3-5C03-4B0E-BCC6-C370A7FE225D.png",
+        "isAssociatedWithFailure": false,
+        "suggestedHumanReadableName": "01-empty-offline-workspace_0_F59BB3E1-ABB0-4BCA-BD1E-FBAE2EEF93FC.png",
+        "timestamp": 1792717169.484,
+        "path": "screenshots/01-empty-offline-workspace.png"
+      }
+    ],
+    "testIdentifier": "FieldLogUITests/testOfflineWorkflowPreservesDraftAcrossRelaunchAndSharesReport()",
+    "testIdentifierURL": "test://com.apple.xcode/FieldLog/FieldLogUITests/FieldLogUITests/testOfflineWorkflowPreservesDraftAcrossRelaunchAndSharesReport"
+  }
+]
