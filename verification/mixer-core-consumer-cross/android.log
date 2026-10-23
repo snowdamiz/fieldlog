@@ -1,0 +1,11 @@
+Fetching https://github.com/snowdamiz/mixer.git from cache
+Fetched https://github.com/snowdamiz/mixer.git from cache (0.01s)
+Creating working copy for https://github.com/snowdamiz/mixer.git
+Working copy of https://github.com/snowdamiz/mixer.git resolved at d8c6965a277ca21e685f3ef9e0f68a7d59b46156
+Building for production...
+[0/4] Write sources
+[3/4] Write swift-version-335F6997E76BF448.txt
+[5/6] Compiling MixerCore FeatureStore.swift
+[6/6] Compiling FieldLogModels Workspace.swift
+[7/7] Compiling FieldLogFeatures TaskEditor.swift
+Build of target: 'FieldLogFeatures' complete! (4.10s)

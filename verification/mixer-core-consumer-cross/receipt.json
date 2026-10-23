@@ -1,0 +1,40 @@
+{
+  "schema": 1,
+  "observedAt": "2026-10-23T01:14:57.059212+00:00",
+  "status": "passed cross-compilation only",
+  "fieldlogSourceRevision": "d51adf50de7e20549e87062e4569609342cdfe25",
+  "mixerPublicRevision": "d8c6965a277ca21e685f3ef9e0f68a7d59b46156",
+  "target": "FieldLogFeatures",
+  "sourceSHA256": "ef5321a92467868227007b856aca5c7ed142e5337d8dbb20a07e0e3394335310",
+  "commands": [
+    {
+      "target": "aarch64-unknown-linux-android28",
+      "command": "DEVELOPER_DIR=/Applications/Xcode_26.6.app/Contents/Developer /Users/andreyyurlov/Library/Developer/Toolchains/swift-6.3.3-RELEASE.xctoolchain/usr/bin/swift build --package-path /Users/andreyyurlov/Documents/dev/fieldlog --target FieldLogFeatures --swift-sdks-path /Users/andreyyurlov/.swiftpm/swift-sdks --swift-sdk aarch64-unknown-linux-android28 -c release --scratch-path /Users/andreyyurlov/Documents/dev/mixer/verification/local/fieldlog-public-sdk-android",
+      "exitCode": 0,
+      "output": "android.log",
+      "outputSHA256": "3be7b6f41e3d4a23bd082e4d9eba4dcdd225e505fa2c0732e29adc6cc417b0a1",
+      "objectPath": "/Users/andreyyurlov/Documents/dev/mixer/verification/local/fieldlog-public-sdk-android/aarch64-unknown-linux-android28/release/FieldLogFeatures.build/TaskEditor.swift.o",
+      "objectBytes": 92728,
+      "objectSHA256": "31b9906859e17606eb66564d2dc7bec3a4af2f76042237590d06723599897385",
+      "fileIdentification": "/Users/andreyyurlov/Documents/dev/mixer/verification/local/fieldlog-public-sdk-android/aarch64-unknown-linux-android28/release/FieldLogFeatures.build/TaskEditor.swift.o: ELF 64-bit LSB relocatable, ARM aarch64, version 1 (GNU/Linux), with debug_info, not stripped",
+      "executed": false
+    },
+    {
+      "target": "wasm32-unknown-wasip1",
+      "command": "DEVELOPER_DIR=/Applications/Xcode_26.6.app/Contents/Developer /Users/andreyyurlov/Library/Developer/Toolchains/swift-6.3.3-RELEASE.xctoolchain/usr/bin/swift build --package-path /Users/andreyyurlov/Documents/dev/fieldlog --target FieldLogFeatures --swift-sdks-path /Users/andreyyurlov/.swiftpm/swift-sdks --swift-sdk swift-6.3.3-RELEASE_wasm --triple wasm32-unknown-wasip1 -c release --scratch-path /Users/andreyyurlov/Documents/dev/mixer/verification/local/fieldlog-public-sdk-wasi",
+      "exitCode": 0,
+      "output": "wasi.log",
+      "outputSHA256": "79e1248d8d500132be54c42df1b22c7edf08f9ec1efcf0a508f0b3b23ff24c2a",
+      "objectPath": "/Users/andreyyurlov/Documents/dev/mixer/verification/local/fieldlog-public-sdk-wasi/wasm32-unknown-wasip1/release/FieldLogFeatures.build/TaskEditor.swift.o",
+      "objectBytes": 60649,
+      "objectSHA256": "9e23d1261b2d516ba5d5b4b60e9ab43a014a654e89c2de3b54356682b47b751c",
+      "fileIdentification": "/Users/andreyyurlov/Documents/dev/mixer/verification/local/fieldlog-public-sdk-wasi/wasm32-unknown-wasip1/release/FieldLogFeatures.build/TaskEditor.swift.o: WebAssembly (wasm) binary module version 0x1 (MVP)",
+      "executed": false
+    }
+  ],
+  "limitations": [
+    "Object/module compilation of actual shared task editor, FieldLogModels and remote public MixerCore only.",
+    "No executable guest linked, no native Android or Wasm runtime tests, no owned VM validation or execution.",
+    "No Android UI/FieldLog app or physical device qualification; D2-D3 remain open."
+  ]
+}
