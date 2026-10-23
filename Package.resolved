@@ -1,0 +1,14 @@
+{
+  "originHash" : "1973991a7d948bf04287fee7b6f3bd27a641797cb209794b3374de9bb08e8fd9",
+  "pins" : [
+    {
+      "identity" : "mixer",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/snowdamiz/mixer.git",
+      "state" : {
+        "revision" : "d8c6965a277ca21e685f3ef9e0f68a7d59b46156"
+      }
+    }
+  ],
+  "version" : 3
+}

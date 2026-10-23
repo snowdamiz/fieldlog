@@ -66,9 +66,18 @@ it still does not establish real-user, authentication or store qualification.
 This is D0 groundwork, **not a passed D0 milestone**. Login/auth, a production
 backend, team synchronization/conflicts, camera capture, maps, push, purchases,
 real users/records, physical-device recordings/timings and store distributions
-remain required. Public immutable Mixer SDK adoption follows the native baseline;
-Android and interpreted/OTA modes remain later gates. Local source debugging is
-not package-consumer or dogfood release qualification.
+remain required. The native task editor now consumes `MixerCore` from the public
+Git repository at revision `d8c6965a277ca21e685f3ef9e0f68a7d59b46156`, through
+the separate `FieldLogFeatures` module. The public state/effect owner validates
+input, admits one save, preserves text after failure and rejects completions after
+the editor closes. Existing native controls and the serialized workspace repository
+remain in use. Cancellation does not undo a save already committed to disk.
+
+Both SwiftPM and Xcode lock that remote revision; no Mixer checkout path or internal
+module is imported. Seventeen host tests and the original simulator workflow pass.
+This is initial external package consumption, not full MixerUI migration or D1
+acceptance. Android, interpreted/OTA modes, physical regression and the remaining
+dogfood requirements stay open. No stable Mixer API or release tag is implied.
 
 See `verification/native-baseline-2026-10-22.json` for exact observed evidence and
 `scripts/verify.sh` for the separate repository's local CI entrypoint. No hosted

@@ -1,4 +1,5 @@
 import FieldLogModels
+import FieldLogFeatures
 import SwiftUI
 
 struct ProjectDetail: View {
@@ -177,18 +178,22 @@ private struct NewTaskView: View {
   @EnvironmentObject private var model: WorkspaceModel
   @Environment(\.dismiss) private var dismiss
   let projectID: UUID
-  @State private var title = ""
-  @State private var responsible = ""
-  @State private var saving = false
+  @State private var form = TaskEditorState()
+  @State private var editor: TaskEditor?
+  @State private var observation: UUID?
+  @State private var editorError: String?
   var body: some View {
     NavigationStack {
       Form {
         Section("Task") {
-          TextField("What needs to happen?", text: $title, axis: .vertical).accessibilityIdentifier(
-            "task-title")
-          TextField("Responsible person (optional)", text: $responsible)
+          TextField("What needs to happen?", text: Binding(
+            get: { form.title }, set: { value in perform { try $0.changeTitle(value) } }), axis: .vertical)
+            .accessibilityIdentifier("task-title").disabled(form.saving)
+          TextField("Responsible person (optional)", text: Binding(
+            get: { form.responsible }, set: { value in perform { try $0.changeResponsible(value) } }))
+            .disabled(form.saving)
         }
-        if let error = model.saveError {
+        if let error = editorError ?? form.failure {
           Section { Label(error, systemImage: "exclamationmark.triangle").foregroundStyle(.red) }
         }
         Section {
@@ -198,21 +203,40 @@ private struct NewTaskView: View {
         }
       }.navigationTitle("New task").navigationBarTitleDisplayMode(.inline).toolbar {
         ToolbarItem(placement: .cancellationAction) {
-          Button("Cancel") { dismiss() }.disabled(saving)
+          Button("Cancel") { dismiss() }.disabled(form.saving)
         }
         ToolbarItem(placement: .confirmationAction) {
-          Button("Add") {
-            saving = true
-            Task {
-              if await model.addTask(projectID: projectID, title: title, responsible: responsible) {
-                dismiss()
-              }
-              saving = false
-            }
-          }.disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || saving)
+          Button("Add") { perform { try $0.submit() } }
+            .disabled(editor == nil || !form.canSubmit)
         }
       }
-    }.interactiveDismissDisabled(saving)
+    }.interactiveDismissDisabled(form.saving)
+      .onAppear { startEditor() }
+      .onChange(of: form.saved) { _, saved in if saved { dismiss() } }
+      .onDisappear {
+        if let observation { editor?.removeObserver(observation) }
+        try? editor?.close()
+        editor = nil; observation = nil
+      }
+  }
+  private func startEditor() {
+    guard editor == nil else { return }
+    do {
+      let feature = try TaskEditor { title, responsible in
+        if await model.addTask(projectID: projectID, title: title, responsible: responsible) { return .saved }
+        return await .failed(model.saveError ?? "Task could not be saved. Your text has been kept.")
+      }
+      try feature.changeTitle(form.title)
+      try feature.changeResponsible(form.responsible)
+      observation = feature.observe { form = $0 }
+      editor = feature
+      editorError = nil
+    } catch { editorError = error.localizedDescription }
+  }
+  private func perform(_ action: (TaskEditor) throws -> Void) {
+    guard let editor else { return }
+    do { try action(editor); editorError = nil }
+    catch { editorError = error.localizedDescription }
   }
 }
 

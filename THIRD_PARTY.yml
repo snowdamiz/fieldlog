@@ -13,5 +13,12 @@ dependencies:
     purpose: Foundation, SwiftUI, UIKit, PhotosUI, CoreTransferable, ImageIO, native sharing
     distribution_mode: System platform frameworks; no SDK redistribution
     owner: FieldLog native baseline
-external_packages: []
+external_packages:
+  - name: MixerCore
+    origin: https://github.com/snowdamiz/mixer.git
+    revision: d8c6965a277ca21e685f3ef9e0f68a7d59b46156
+    purpose: Native task editor state, owned asynchronous save effects and lifecycle
+    distribution_mode: Immutable public Git source dependency, exact revision in both package locks
+    ownership: First-party independently authored Mixer code; no third-party engine
+    qualification: Development API only; initial host and simulator consumer evidence, full dogfood gates open
 provenance: Original app and tests independently authored; no competitor implementation or fixtures used.
