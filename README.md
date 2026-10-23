@@ -1,8 +1,9 @@
 # FieldLog
 
 An original native Swift iOS app for keeping project checklists, field notes and
-photos together. This repository starts with an ordinary SwiftUI baseline;
-it currently has no Mixer SDK dependency or checkout link.
+photos together. This repository began with an ordinary SwiftUI baseline. Its
+native task editor now consumes the public MixerCore package at an immutable Git
+revision, with no dependency on a local Mixer checkout.
 
 The app opens an empty **offline workspace** without an account. Create a
 project, add and reorder tasks, write a dated/categorized entry, keep an automatic
