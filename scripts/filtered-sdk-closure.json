@@ -1,0 +1,746 @@
+{
+  "revision": "56ff14c925168284761c5aca4f0bd4129cf3c995",
+  "tree": "75989099938ed5256c4144cbc9e62979ee323183",
+  "rootEntries": [
+    {
+      "path": ".github",
+      "mode": "040000",
+      "type": "tree",
+      "oid": "455dde5187b5a8aebe8eb09c17c37ae9cf932ddd"
+    },
+    {
+      "path": ".gitignore",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "cde46e32669573c8b8cf102bcebe08f079e34dab"
+    },
+    {
+      "path": "AGENTS.md",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "3edc4289b71800b7bdd57ad1e1cdd5aab89d6f1d"
+    },
+    {
+      "path": "PLAN.history-2026-10-25.md",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "d8a28b4ffc179a5d892b1ae30228da77e61cf6f7"
+    },
+    {
+      "path": "PLAN.md",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "c303943a456d8daeeeaba3a6700efba9dac96bbe"
+    },
+    {
+      "path": "Package.swift",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "c4b6843e56ec8ef44f14a73300b28b44851f1bed"
+    },
+    {
+      "path": "README.md",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "a8d86c2e68aa9f8ebe3625ae501d537d38326003"
+    },
+    {
+      "path": "STATUS.history-2026-10-25.md",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "957d40b672fd83df395f5101985c22bf1a871073"
+    },
+    {
+      "path": "STATUS.md",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "dfccd0d81cb31e22dcd3ceead1f8d14dc0d1b879"
+    },
+    {
+      "path": "THIRD_PARTY.yml",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "2f1c06d2ca2f864bbaa9b23d528682d4319ef509"
+    },
+    {
+      "path": "activation",
+      "mode": "040000",
+      "type": "tree",
+      "oid": "69609c72788843e56e503bebf736f2c9126fb158"
+    },
+    {
+      "path": "capabilities",
+      "mode": "040000",
+      "type": "tree",
+      "oid": "b7d52c9fc3b846541ae04bcdd76ef48fb97deb80"
+    },
+    {
+      "path": "capability-activation",
+      "mode": "040000",
+      "type": "tree",
+      "oid": "7dfb55e40931091491022fbf4c17cf57fefc5f45"
+    },
+    {
+      "path": "cli",
+      "mode": "040000",
+      "type": "tree",
+      "oid": "8f2787528753e52c528cd0278959f6e850c4f189"
+    },
+    {
+      "path": "compiler",
+      "mode": "040000",
+      "type": "tree",
+      "oid": "988f99b1b910e5cef9c55eecd47064dd146da12a"
+    },
+    {
+      "path": "console",
+      "mode": "040000",
+      "type": "tree",
+      "oid": "bb18b5d2aa1591940a602441c03e6c468f5f87fd"
+    },
+    {
+      "path": "contracts",
+      "mode": "040000",
+      "type": "tree",
+      "oid": "95c1f9437a3785800cf4cf9c96f1dad84d91166b"
+    },
+    {
+      "path": "docs",
+      "mode": "040000",
+      "type": "tree",
+      "oid": "a0647517d2efc26bcf0c92bc8f4872d88bd31271"
+    },
+    {
+      "path": "dogfood",
+      "mode": "040000",
+      "type": "tree",
+      "oid": "bb1405b54bc5af7c646fe15b65214f867550ae6a"
+    },
+    {
+      "path": "experimental-capability-runtime",
+      "mode": "040000",
+      "type": "tree",
+      "oid": "880997ca34c2e76db902395e251693d6f1215ff8"
+    },
+    {
+      "path": "gates",
+      "mode": "040000",
+      "type": "tree",
+      "oid": "cab54edcdef30161a57d23f37a665a5939555f2a"
+    },
+    {
+      "path": "hosted-worker-controller",
+      "mode": "040000",
+      "type": "tree",
+      "oid": "8384569c09a22d30709c434881092e77336b8221"
+    },
+    {
+      "path": "hosted",
+      "mode": "040000",
+      "type": "tree",
+      "oid": "90bda5e20a3ce8c3f6aac3e031ab7ca3db666f06"
+    },
+    {
+      "path": "mixer-product-plan.md",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "e0d522a0ae1c62fcb98e9105e7ea180b56b5ebc2"
+    },
+    {
+      "path": "native",
+      "mode": "040000",
+      "type": "tree",
+      "oid": "3681645007fca33a3c90bd0f7ec99d317a603f2e"
+    },
+    {
+      "path": "release",
+      "mode": "040000",
+      "type": "tree",
+      "oid": "f83378fbb4ca76f05f0edcad5519e1d46793d768"
+    },
+    {
+      "path": "runtime-identity",
+      "mode": "040000",
+      "type": "tree",
+      "oid": "2217de7c6108f38ff14bc711ccc0e17a80f15c6b"
+    },
+    {
+      "path": "runtime",
+      "mode": "040000",
+      "type": "tree",
+      "oid": "81cca858c6b3fb5e844f15d02cc8de2b40ff3390"
+    },
+    {
+      "path": "scripts",
+      "mode": "040000",
+      "type": "tree",
+      "oid": "467844d99eccf250f479fa9005ec83747c85fda9"
+    },
+    {
+      "path": "sdk",
+      "mode": "040000",
+      "type": "tree",
+      "oid": "ab7fdd557af1278e5127fe7ff59ff0df7d7820f0"
+    },
+    {
+      "path": "services",
+      "mode": "040000",
+      "type": "tree",
+      "oid": "0533804efea0f84393e440000f0dc94fbc26c408"
+    },
+    {
+      "path": "tests",
+      "mode": "040000",
+      "type": "tree",
+      "oid": "002473b72ffa00fa864a1c23ecd5a12a80614a86"
+    },
+    {
+      "path": "updates",
+      "mode": "040000",
+      "type": "tree",
+      "oid": "0514500d4aa0e461ea6b77bde420e12ee7eae4d4"
+    },
+    {
+      "path": "verification",
+      "mode": "040000",
+      "type": "tree",
+      "oid": "440e93b10e2886f4639fbeb7d7fa86cfb2ffc806"
+    },
+    {
+      "path": "vm",
+      "mode": "040000",
+      "type": "tree",
+      "oid": "ef1647eeee563d5a0d9abc985879b262f1e56db8"
+    },
+    {
+      "path": "website",
+      "mode": "040000",
+      "type": "tree",
+      "oid": "2ca73782b18e5b6abd4f0c739e7266d649e182f7"
+    },
+    {
+      "path": "work-graph.json",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "c2445ee2a7a5e6339c8d865508cca195150808b4"
+    }
+  ],
+  "entries": [
+    {
+      "path": "Package.swift",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "c4b6843e56ec8ef44f14a73300b28b44851f1bed",
+      "bytes": 1757
+    },
+    {
+      "path": "sdk/Package.swift",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "5b961b8da72725873c1fd0b51bf32528be358c8d",
+      "bytes": 1334
+    },
+    {
+      "path": "sdk/README.md",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "7ba2e14d489355c142f9eb9b79aa8feb6234cad4",
+      "bytes": 11051
+    },
+    {
+      "path": "sdk/Sources/MixerApple/AppearanceEnvironmentV2.swift",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "f5f33f844c48767c84547df7592d67ce396a0c5c",
+      "bytes": 3571
+    },
+    {
+      "path": "sdk/Sources/MixerApple/AppearanceInstalledV2.swift",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "4e09fb9b117d489119e4fad277bc139cfb6ceacb",
+      "bytes": 3044
+    },
+    {
+      "path": "sdk/Sources/MixerApple/AppearanceNativeGeometryV2.swift",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "592715999fce75979c4bd21922f825d32ef8225f",
+      "bytes": 4175
+    },
+    {
+      "path": "sdk/Sources/MixerApple/AppearanceNativeLayoutV2.swift",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "312b3c3b277eb44b1b8a1508d2c9b33b336d60c9",
+      "bytes": 33140
+    },
+    {
+      "path": "sdk/Sources/MixerApple/AppearanceNativePathsV2.swift",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "979dabf1deb1a8be9a8bcfa71c63714f22d3889f",
+      "bytes": 1644
+    },
+    {
+      "path": "sdk/Sources/MixerApple/AppearanceNativeRendererV2.swift",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "09df6e5f90cde5a89f0e4e2bb7f5b294738e4aed",
+      "bytes": 25879
+    },
+    {
+      "path": "sdk/Sources/MixerApple/AppearanceNativeViewsV2.swift",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "c34e17ddb1050b35ed287dba14e2082475d51ddf",
+      "bytes": 29796
+    },
+    {
+      "path": "sdk/Sources/MixerApple/MixerNativeView.swift",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "4ecebd4796a84cf877819f96bf15dabecdc66393",
+      "bytes": 7611
+    },
+    {
+      "path": "sdk/Sources/MixerCapabilities/AppPrivateKeyValueStore.swift",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "4a50a28eff49c18708760b98d67eac5b14fe1c7e",
+      "bytes": 12454
+    },
+    {
+      "path": "sdk/Sources/MixerCapabilities/CapabilityExitLease.swift",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "50f39fc99e19c276d183c986b7a7f02049551ca2",
+      "bytes": 1163
+    },
+    {
+      "path": "sdk/Sources/MixerCapabilities/GeneratedGuestAdapters.swift",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "f4b255b3b9bb23f9d1cef53edadb590cd72de23e",
+      "bytes": 1101
+    },
+    {
+      "path": "sdk/Sources/MixerCapabilities/GeneratedGuestTransport.swift",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "357fbac2930b6b7da76f5e6bd7b1258bec5c2fe3",
+      "bytes": 5606
+    },
+    {
+      "path": "sdk/Sources/MixerCapabilities/GeneratedHostAdapters.swift",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "fa9040c3cdf9687b41453d201c53257536faa3b8",
+      "bytes": 1342
+    },
+    {
+      "path": "sdk/Sources/MixerCapabilities/GeneratedIdentity.swift",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "ef30035ce2ec295a08ec4d31461bd0e71eb11efc",
+      "bytes": 262
+    },
+    {
+      "path": "sdk/Sources/MixerCapabilities/GeneratedModels.swift",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "0f95538f252757d25d17b101a1015e42c8adafd5",
+      "bytes": 9687
+    },
+    {
+      "path": "sdk/Sources/MixerCapabilities/GuestClient.swift",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "3e0f7aa7eaf85ed172f3dd46f19d193ef0ca4d73",
+      "bytes": 1788
+    },
+    {
+      "path": "sdk/Sources/MixerCapabilities/Host.swift",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "ce64d995dcb50adef3beda5ca8f0fcb805fd75e2",
+      "bytes": 16663
+    },
+    {
+      "path": "sdk/Sources/MixerCapabilities/InstalledCapabilityAdapters.swift",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "ac6ed0e404602cdeb6e3e2896c2493a40b5f5ec5",
+      "bytes": 2525
+    },
+    {
+      "path": "sdk/Sources/MixerCapabilities/NativeIO/include/MixerCapabilityIO.h",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "62149899f9fddace1d0a515133a1991e8e56cae6",
+      "bytes": 125
+    },
+    {
+      "path": "sdk/Sources/MixerCapabilities/NativeIO/lock.c",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "d5c2a2ccaa5897470e1a98d64ec9535076501927",
+      "bytes": 151
+    },
+    {
+      "path": "sdk/Sources/MixerCapabilities/URLSessionHTTPTransport.swift",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "607c50d5a65d626bcf6d379d4538acac573d5702",
+      "bytes": 17557
+    },
+    {
+      "path": "sdk/Sources/MixerCapabilities/Wire.swift",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "82798493342910bb0155fb5696694db20844c665",
+      "bytes": 15327
+    },
+    {
+      "path": "sdk/Sources/MixerCore/FeatureStore.swift",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "7f4bcc2b2d3fbb32acf18b44f8ab946c07ae23ef",
+      "bytes": 4358
+    },
+    {
+      "path": "sdk/Sources/MixerCore/JSONInputGuard.swift",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "f3548c10f97952042e91c6129ad9b492614c5636",
+      "bytes": 8709
+    },
+    {
+      "path": "sdk/Sources/MixerCore/Lifecycle.swift",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "e79a1e3c4eb493cb47c3a2856c0593cf7c86ec1b",
+      "bytes": 935
+    },
+    {
+      "path": "sdk/Sources/MixerCore/Navigation.swift",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "7aebfc9b01333432cf6daa59b483d60aefaf02df",
+      "bytes": 3101
+    },
+    {
+      "path": "sdk/Sources/MixerCore/Resources.swift",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "578487d6bee573a4fcb6e4aebdb8593951e21633",
+      "bytes": 3301
+    },
+    {
+      "path": "sdk/Sources/MixerGuest/GuestUICodec.swift",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "ab0c7fc7579c6fe8747279cca2976acdd3e92f59",
+      "bytes": 567
+    },
+    {
+      "path": "sdk/Sources/MixerGuest/GuestUIEventCodecV1.swift",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "abe06e83924c8ba99ce47cb05e93a465c10323a3",
+      "bytes": 5546
+    },
+    {
+      "path": "sdk/Sources/MixerGuest/GuestUIExchangeV1.swift",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "65891bec7d0dbdca5565f2a3b47d6f387fb654c8",
+      "bytes": 20951
+    },
+    {
+      "path": "sdk/Sources/MixerGuest/GuestUIProtocolV1.swift",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "8ba82b8ff24e986c8b0b130973d06b23fca61b7f",
+      "bytes": 5302
+    },
+    {
+      "path": "sdk/Sources/MixerGuest/GuestUIWakeV1.swift",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "290d8a0dc14491aa6cd5687cc3e3c142fdb54d61",
+      "bytes": 2574
+    },
+    {
+      "path": "sdk/Sources/MixerUI/AppearanceDefaultV1.swift",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "d1a7c473b7720c6a2af11395a22e49c6b52d25ba",
+      "bytes": 2345
+    },
+    {
+      "path": "sdk/Sources/MixerUI/AppearanceDefaultV2.swift",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "ba338159b7d26f7448adce44f7c5009df7506be3",
+      "bytes": 10020
+    },
+    {
+      "path": "sdk/Sources/MixerUI/AppearanceDescriptorV1.swift",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "ecd0fee194ab3dd4a3452bc2ee410e970d9dee34",
+      "bytes": 34130
+    },
+    {
+      "path": "sdk/Sources/MixerUI/AppearanceDescriptorV2.swift",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "ea95f10c31d57790ae126bf26742695c1f90f65c",
+      "bytes": 51011
+    },
+    {
+      "path": "sdk/Sources/MixerUI/AppearanceGeometryV2.swift",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "eb06e38871d8e3be3c5678d83389c8a2f478ebb8",
+      "bytes": 8977
+    },
+    {
+      "path": "sdk/Sources/MixerUI/AppearanceMetricMathV1.swift",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "b29a43a15284fad1aacea83470c42e7608772157",
+      "bytes": 1508
+    },
+    {
+      "path": "sdk/Sources/MixerUI/AppearanceResolutionV1.swift",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "80afcbd4c8e79c13bf3b8117d49dd2305e7d6238",
+      "bytes": 17046
+    },
+    {
+      "path": "sdk/Sources/MixerUI/AppearanceResolutionV2.swift",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "b7e1878b452850057873555216c46ecfd279c533",
+      "bytes": 26464
+    },
+    {
+      "path": "sdk/Sources/MixerUI/AppearanceValuesV1.swift",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "fdfa1f5542ebb24687df0a07d42c0ae6b04d83bd",
+      "bytes": 12170
+    },
+    {
+      "path": "sdk/Sources/MixerUI/AppearanceValuesV2.swift",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "5d781181129cce978d7f5266fdf8521d9eccb173",
+      "bytes": 17346
+    },
+    {
+      "path": "sdk/Sources/MixerUI/Authoring.swift",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "c963b96e90d0afee40128840c0086d78c0350c54",
+      "bytes": 6559
+    },
+    {
+      "path": "sdk/Sources/MixerUI/NativePacketV1.swift",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "a38e5dd7d41c41ac9e492031383c52f4b77ad14a",
+      "bytes": 4703
+    },
+    {
+      "path": "sdk/Sources/MixerUI/Protocol.swift",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "313d37a96a6cdf43267858a605c1186946c034b3",
+      "bytes": 9315
+    },
+    {
+      "path": "sdk/Sources/MixerUI/Reconciliation.swift",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "be737beeaccee321e134d1139cdb2cbd14fa6f4d",
+      "bytes": 6561
+    },
+    {
+      "path": "sdk/Sources/MixerUI/SharedTextProfilesV1.swift",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "bb9082eafb84de174ca6cf3982fc706981906f53",
+      "bytes": 3644
+    },
+    {
+      "path": "sdk/Sources/MixerUI/Validation.swift",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "7a517f869c61151c85e5135cf3f71ce2179bff21",
+      "bytes": 11627
+    },
+    {
+      "path": "sdk/Tests/MixerAppleTests/AppearanceNativePathsV2Tests.swift",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "bbbbb4a9b7570864fa8d41abbfb8f344f5cfedc3",
+      "bytes": 5171
+    },
+    {
+      "path": "sdk/Tests/MixerAppleTests/AppleTests.swift",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "1a46f8c8fe49829a9faf3eec12a7bf2880fb8574",
+      "bytes": 1839
+    },
+    {
+      "path": "sdk/Tests/MixerAppleTests/TextFieldAxisHostTests.swift",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "abd6fe46358c0a44e8edcf571888ca3b9457d0ce",
+      "bytes": 2419
+    },
+    {
+      "path": "sdk/Tests/MixerCoreTests/CoreTests.swift",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "a279813cf17ee9eb6b5c7c2b2e0a6474ca7ca44d",
+      "bytes": 6021
+    },
+    {
+      "path": "sdk/Tests/MixerCoreTests/JSONInputGuardTests.swift",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "b81225e4ba4857c6ab5739c092d5032278acfdb9",
+      "bytes": 3615
+    },
+    {
+      "path": "sdk/Tests/MixerUITests/AppearanceDescriptorV2Tests.swift",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "d860971328aa318b2375217606b51275331a40a3",
+      "bytes": 21026
+    },
+    {
+      "path": "sdk/Tests/MixerUITests/AppearanceGeometryV2Tests.swift",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "468b1cb635895a5f5d8cda6fc802a46cf5c9b7ac",
+      "bytes": 8035
+    },
+    {
+      "path": "sdk/Tests/MixerUITests/AppearanceResolutionV1Tests.swift",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "9d6b1dbca1dae99ba9ba3a41a3729e38277dd26a",
+      "bytes": 31757
+    },
+    {
+      "path": "sdk/Tests/MixerUITests/AppearanceResolutionV2Tests.swift",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "139037ece68e2939f940d301727364222b81d743",
+      "bytes": 39869
+    },
+    {
+      "path": "sdk/Tests/MixerUITests/AppearanceV1Tests.swift",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "ab856294934b913bcc72c68d58c48c7fb620980a",
+      "bytes": 19992
+    },
+    {
+      "path": "sdk/Tests/MixerUITests/GuestUIEventCodecTests.swift",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "80eeabc9711ee0fd3221c2f910abdd74e905c95f",
+      "bytes": 4674
+    },
+    {
+      "path": "sdk/Tests/MixerUITests/GuestUIExchangeTests.swift",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "6fb9ebb173b33684690be747eaf6239432d297f1",
+      "bytes": 20724
+    },
+    {
+      "path": "sdk/Tests/MixerUITests/GuestUIWakeTests.swift",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "c33bbd612a4c0ca033e33b7b6288ca20d1f88975",
+      "bytes": 1862
+    },
+    {
+      "path": "sdk/Tests/MixerUITests/NativePacketV1Tests.swift",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "e73fb11fdb2d00c1bb044730452681d63a676c78",
+      "bytes": 10878
+    },
+    {
+      "path": "sdk/Tests/MixerUITests/RawJSONTests.swift",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "ff8d59a9140b093a6fddc981a13776bfa842d815",
+      "bytes": 3953
+    },
+    {
+      "path": "sdk/Tests/MixerUITests/SharedTextProfilesV1Tests.swift",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "cdb1108209f8b996e69ad89922eaa7f8a5c52410",
+      "bytes": 3153
+    },
+    {
+      "path": "sdk/Tests/MixerUITests/TextFieldAxisTests.swift",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "d0d4a2ae442868a2dc2c7f13d125d3172c6c305b",
+      "bytes": 10311
+    },
+    {
+      "path": "sdk/Tests/MixerUITests/UITests.swift",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "24f253217b4fa8e0b25680ba4a7c991bd46e7a1d",
+      "bytes": 10849
+    },
+    {
+      "path": "sdk/verification/current/ios-build.log",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "1a148f49c9e0d76bad99dbfa8c3a4c03e64f6d50",
+      "bytes": 353
+    },
+    {
+      "path": "sdk/verification/current/receipt.json",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "99213cbc5f348cb7d5134fd66affe01f298cde96",
+      "bytes": 5858
+    },
+    {
+      "path": "sdk/verification/current/swift-test.log",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "93e5e6ca7fda6901ab788a91848ca97fa14e9e14",
+      "bytes": 4916
+    },
+    {
+      "path": "sdk/verification/verify.py",
+      "mode": "100644",
+      "type": "blob",
+      "oid": "085910e2b7bca0c84646dcfbfe9da0d17e749b93",
+      "bytes": 4406
+    }
+  ],
+  "count": 73,
+  "logicalBlobBytes": 709204,
+  "manifestSHA256": "dbb1065830923ee249e991ff393808133f97261fcaf838969c18d15a08c7811b",
+  "manifestBlobOID": "c4b6843e56ec8ef44f14a73300b28b44851f1bed",
+  "scope": "Exact root manifest plus all sdk/ files; local existing Git object metadata only; remote consumption not tested."
+}

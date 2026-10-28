@@ -18,7 +18,7 @@ jobs:
       DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
       TOOLCHAINS: com.apple.dt.toolchain.XcodeDefault
       PYTHONUNBUFFERED: "1"
-      FIELDLOG_HOST_CI_SELECTION: public-pin-development-v1
+      FIELDLOG_HOST_CI_SELECTION: filtered-public-pin-host-v1
     steps:
       - name: Check out the separate FieldLog commit
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262

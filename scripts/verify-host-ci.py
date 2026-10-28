@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import datetime
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -18,6 +19,7 @@ import re
 import resource
 import selectors
 import signal
+import shutil
 import stat
 import subprocess
 import sys
@@ -32,8 +34,11 @@ HOST_PHASE_SECONDS = 480
 OUTPUT_TIMELINE_LIMIT = 512
 TOTAL_SECONDS = 750
 CLEANUP_SECONDS = 30
-OUTPUT_LIMIT = 32 * 1024 * 1024
-SELECTION = "public-pin-development-v1"
+OUTPUT_LIMIT = 16 * 1024 * 1024
+SELECTION = "filtered-public-pin-host-v1"
+TRANSPORT_SPEC = importlib.util.spec_from_file_location("fieldlog_filtered_transport", Path(__file__).with_name("filtered-sdk-git.py"))
+TRANSPORT = importlib.util.module_from_spec(TRANSPORT_SPEC)
+TRANSPORT_SPEC.loader.exec_module(TRANSPORT)
 
 
 def utc():
@@ -102,7 +107,9 @@ def child_entry(arguments):
         os.close(descriptor)
     if not admitted or len(arguments) < 2:
         return 125
-    os.execvpe(arguments[1], arguments[1:], os.environ.copy())
+    environment = os.environ.copy()
+    environment["FIELDLOG_TRANSPORT_PGID"] = str(os.getpgrp())
+    os.execvpe(arguments[1], arguments[1:], environment)
     return 125
 
 
@@ -164,7 +171,7 @@ class Runner:
         except OSError as error:
             return "ambiguous-errno-" + str(error.errno)
 
-    def run(self, name, command, seconds, cwd=None, absolute_deadline=None):
+    def run(self, name, command, seconds, cwd=None, absolute_deadline=None, environment=None):
         if self.cancel_signal or self.deadline - time.monotonic() <= CLEANUP_SECONDS:
             raise VerificationFailure("Cancelled or no execution budget remains before cleanup reserve")
         result = {"name": name, "command": command, "cwd": str(cwd or self.root),
@@ -267,7 +274,7 @@ class Runner:
             result["spawnAttempted"] = True
             process = subprocess.Popen(
                 [sys.executable, "-B", str(Path(__file__).resolve()), "--owned-child", str(gate_read), *command],
-                cwd=cwd or self.root, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                cwd=cwd or self.root, env=environment, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT, start_new_session=True, pass_fds=(gate_read,),
             )
             os.close(gate_read)
@@ -296,6 +303,10 @@ class Runner:
             while time.monotonic() < execution_deadline:
                 if self.cancel_signal:
                     stop = "cancel-signal-" + str(self.cancel_signal)
+                    break
+                state_path = self.work / "transport-state.json"
+                if state_path.exists() and strict_json(TRANSPORT.regular(state_path, 1024 * 1024)).get("failed"):
+                    stop = "filtered-transport-failed-no-retry"
                     break
                 drain(0.05)
                 reap()
@@ -381,8 +392,9 @@ class Runner:
             raise VerificationFailure("Command failed or cleanup is held: " + name)
         return log.read_bytes()
 
-    def source_entries(self, phase):
-        names = self.run(phase + "-tracked-paths", ["git", "ls-files", "-z"], 15).decode("utf-8").split("\0")
+    def source_entries(self, phase, run=None):
+        run = run or self.run
+        names = run(phase + "-tracked-paths", [str(getattr(self, "real_git", "git")), "ls-files", "-z"], 15).decode("utf-8").split("\0")
         paths = [name for name in names if name]
         if not 1 <= len(paths) <= 1024:
             raise VerificationFailure("Source file-count bound")
@@ -399,7 +411,7 @@ class Runner:
             total += info.st_size
             if info.st_size > OUTPUT_LIMIT or total > 128 * 1024 * 1024:
                 raise VerificationFailure("Source byte bound")
-            data = path.read_bytes()
+            data = TRANSPORT.regular(path, OUTPUT_LIMIT)
             entries.append({"path": name, "bytes": len(data), "sha256": digest(data)})
         encoded = json.dumps(entries, sort_keys=True, separators=(",", ":")).encode()
         self.receipt[phase + "Sources"] = {"entries": entries, "digest": digest(encoded)}
@@ -422,16 +434,116 @@ class Runner:
         if not checkout.resolve().is_relative_to(scratch.resolve()):
             raise VerificationFailure("Dependency checkout escapes owned CI work")
         consumed = run(phase + "-consumed-sdk-pin",
-            ["git", "-C", str(checkout), "rev-parse", "HEAD"], 15).decode().strip()
+            [str(self.real_git), "-C", str(checkout), "rev-parse", "HEAD"], 15).decode().strip()
         consumed_tree = run(phase + "-consumed-sdk-tree",
-            ["git", "-C", str(checkout), "rev-parse", "HEAD^{tree}"], 15).decode().strip()
+            [str(self.real_git), "-C", str(checkout), "rev-parse", "HEAD^{tree}"], 15).decode().strip()
         if consumed != PUBLIC_PIN or consumed_tree != tree:
             raise VerificationFailure("Actually consumed SDK commit/tree differs before " + phase)
         if run(phase + "-consumed-sdk-status",
-            ["git", "-C", str(checkout), "status", "--porcelain", "--untracked-files=no"], 15).strip():
+            [str(self.real_git), "-C", str(checkout), "status", "--porcelain", "--untracked-files=no"], 15).strip():
             raise VerificationFailure("Consumed public SDK source changed before " + phase)
         self.receipt.setdefault("consumptionCheckpoints", []).append({"phase": phase,
             "revision": consumed, "tree": consumed_tree, "trackedWorkingTreeClean": True})
+        self.save()
+
+    def prepare_transport(self):
+        """Capture trusted tools before the scoped PATH adapter is introduced."""
+        found = shutil.which("git")
+        if found is None:
+            raise VerificationFailure("Trusted real Git missing")
+        self.real_git = Path(found).resolve(strict=True)
+        trusted_git = TRANSPORT.signature(self.real_git)
+        script = TRANSPORT.nofollow(self.root / "scripts/filtered-sdk-git.py")
+        closure = TRANSPORT.nofollow(self.root / "scripts/filtered-sdk-closure.json")
+        TRANSPORT.closure(TRANSPORT.regular(closure, 1024 * 1024))
+        if any(c.isspace() for c in sys.executable):
+            raise VerificationFailure("Trusted Python shebang path cannot contain whitespace")
+        self.transport_script = script
+        bindir = self.work / "bin"
+        bindir.mkdir(mode=0o700)
+        transport_evidence = self.evidence / "transport"
+        transport_evidence.mkdir(mode=0o700)
+        self.work.chmod(0o700)
+        self.evidence.chmod(0o700)
+        for directory in (self.root, self.work, self.evidence, transport_evidence):
+            TRANSPORT.nofollow(directory)
+        adapter = bindir / "git"
+        raw_script = TRANSPORT.regular(script, 1024 * 1024)
+        adapter.write_bytes(("#!" + sys.executable + "\n").encode() + raw_script.split(b"\n", 1)[1])
+        adapter.chmod(0o700)
+        (self.work / "transport.lock").write_bytes(b"")
+        (self.work / "transport-state.json").write_text(json.dumps(TRANSPORT.new_state()))
+        self.transport_config = {"schema": 1, "selection": SELECTION, "work": str(self.work),
+            "evidence": str(transport_evidence), "app": str(self.root), "git": trusted_git,
+            "closure": str(closure), "originalPATH": os.environ["PATH"], "deadline": self.deadline - CLEANUP_SECONDS,
+            "appRevision": os.environ["GITHUB_SHA"], "sdkRevision": PUBLIC_PIN, "sdkTree": EXPECTED_SDK_TREE}
+        config_path = self.work / "transport-config.json"
+        self.transport_environment = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+        self.transport_environment.update({"PATH": str(bindir) + os.pathsep + os.environ["PATH"],
+            "GIT_NO_LAZY_FETCH": "1", "GIT_TERMINAL_PROMPT": "0", "GIT_CONFIG_NOSYSTEM": "1",
+            "GIT_CONFIG_GLOBAL": "/dev/null", "FIELDLOG_TRANSPORT_CONFIG": str(config_path)})
+        self.set_transport_deadline(self.deadline - CLEANUP_SECONDS)
+        self.receipt["transport"] = {"experiment": SELECTION, "realGit": trusted_git,
+            "adapterSourceSHA256": digest(raw_script), "closureSHA256": TRANSPORT.CLOSURE_SHA,
+            "sourceRoot": str(self.root), "originalPublicURL": PUBLIC_URL,
+            "sdkRevision": PUBLIC_PIN, "sdkTree": EXPECTED_SDK_TREE,
+            "bounds": {"publicAcquisitionSeconds": 180, "ownedGitLogicalBytesSampled": TRANSPORT.STORAGE_LIMIT,
+                "sampleIntervalSeconds": TRANSPORT.SAMPLE_SECONDS, "sampledThresholdMayOvershoot": True,
+                "packageLogicalBytes": 1048576, "innerAggregateCapturedOutputBytes": TRANSPORT.OUTPUT_LIMIT,
+                "outerAggregateCapturedOutputBytes": OUTPUT_LIMIT, "events": 8192,
+                "repositoryClones": 1, "checkoutClones": 3},
+            "processCustody": "inner children inherit outer owned group; no inner group/session creation",
+            "noLazyFetch": True, "workspaceStateFabricated": False, "alternatesFabricated": False,
+            "packByteScope": "stored pack bytes; network wire bytes not measured",
+            "capabilityOrDirectOIDWantFailure": "one experiment failure; no automatic fallback or retry"}
+        self.save()
+
+    def set_transport_deadline(self, deadline):
+        self.transport_config["deadline"] = deadline
+        path = self.work / "transport-config.json"
+        path.write_text(json.dumps(self.transport_config, sort_keys=True))
+
+    def control(self, *arguments):
+        return [sys.executable, "-B", str(self.transport_script), "--control", *arguments]
+
+    def capture_transport(self):
+        path = self.work / "transport-state.json"
+        if path.exists():
+            self.receipt.setdefault("transport", {})["finalState"] = strict_json(TRANSPORT.regular(path, 1024 * 1024))
+
+    def verify_checkpoint(self, scratch, tree, name, phase, before_sources):
+        # All of these operations consume the original shared 480-second clock.
+        self.verify_consumed_sdk(scratch, tree, name, phase)
+        phase(name + "-filtered-closure", self.control("checkpoint", name))
+        checkpoint_lock = self.require_pin(TRANSPORT.regular(self.root / "Package.resolved", 1024 * 1024))
+        current_sources = self.source_entries(name, phase)
+        if [v for v in current_sources if v["path"] != "Package.resolved"] != [v for v in before_sources if v["path"] != "Package.resolved"]:
+            raise VerificationFailure("App source changed before " + name)
+        checkout = scratch / "checkouts/mixer"
+        declaration = phase(name + "-public-declaration", ["swift", "package", "--package-path", str(checkout),
+            "--scratch-path", str(self.work / "sdk-manifest"), "--disable-dependency-cache", "dump-package"])
+        value = strict_json(declaration)
+        targets = value.get("targets")
+        if value.get("name") != "Mixer" or value.get("dependencies") != [] or not isinstance(targets, list) or len(targets) != 9:
+            raise VerificationFailure("Real SwiftPM SDK declaration differs")
+        if {target.get("name"): target.get("path") for target in targets} != TRANSPORT.SDK_TARGETS:
+            raise VerificationFailure("Real SwiftPM SDK target paths differ")
+        if any(target.get("type") not in {"regular", "test"} or target.get("pluginUsages") for target in targets):
+            raise VerificationFailure("Real SwiftPM SDK plugin/target declaration differs")
+        app_declaration = phase(name + "-app-declaration", ["swift", "package", "--scratch-path", str(scratch),
+            "--disable-dependency-cache", "dump-package"])
+        app = strict_json(app_declaration)
+        expected_dependency = [{"identity": "mixer", "location": {"remote": [{"urlString": PUBLIC_URL}]},
+            "productFilter": None, "requirement": {"revision": [PUBLIC_PIN]}}]
+        deps = app.get("dependencies")
+        if not isinstance(deps, list) or len(deps) != 1 or deps[0].get("sourceControl") != expected_dependency:
+            raise VerificationFailure("Real SwiftPM app public dependency declaration differs")
+        if app.get("name") != "FieldLog" or sorted(t.get("name", "") for t in app.get("targets", [])) != ["FieldLogFeatures", "FieldLogModels", "FieldLogStorage", "FieldLogTests"]:
+            raise VerificationFailure("Real SwiftPM app target declaration differs")
+        self.receipt.setdefault("declarationCheckpoints", []).append({"phase": name,
+            "sdkDumpSHA256": digest(declaration), "appDumpSHA256": digest(app_declaration),
+            "sdkTargets": 9, "sdkExternalDependencies": 0, "sdkPlugins": 0,
+            "lockOriginHash": checkpoint_lock["originHash"], "appSourcesUnchanged": True})
         self.save()
 
     def verify(self):
@@ -454,19 +566,20 @@ class Runner:
         (self.evidence / "Package.resolved.before.json").write_bytes(before_bytes)
         self.run("swift-version", ["swift", "--version"], 20)
         self.run("xcode-version", ["xcodebuild", "-version"], 20)
-        self.run("git-version", ["git", "--version"], 15)
+        self.prepare_transport()
+        self.run("git-version", [str(self.real_git), "--version"], 15)
         self.run("mirror-help", ["swift", "package", "config", "set-mirror", "--help"], 20)
         mirror = self.work / "mixer.git"
-        self.run("mirror-init", ["git", "init", "--bare", str(mirror)], 15)
-        self.run("public-pin-fetch", ["git", "-C", str(mirror), "-c", "protocol.version=2", "fetch",
-            "--no-tags", "--depth=1", PUBLIC_URL, PUBLIC_PIN + ":refs/heads/public-sdk-pin"], 180)
-        self.run("mirror-head", ["git", "-C", str(mirror), "symbolic-ref", "HEAD", "refs/heads/public-sdk-pin"], 15)
-        actual_pin = self.run("mirror-pin", ["git", "-C", str(mirror), "rev-parse", "HEAD"], 15).decode().strip()
-        tree = self.run("mirror-tree", ["git", "-C", str(mirror), "rev-parse", "HEAD^{tree}"], 15).decode().strip()
-        if actual_pin != PUBLIC_PIN or tree != EXPECTED_SDK_TREE:
-            raise VerificationFailure("Fetched public SDK differs from immutable pin")
-        self.receipt["sdk"] = {"publicURL": PUBLIC_URL, "revision": actual_pin, "tree": tree,
-            "mirror": mirror.as_uri(), "fetchDepth": 1, "qualification": "development CI mirror only"}
+        # Acquisition is a single shared 180-second stage, including capability,
+        # CLI checks, metadata fetch, explicit 73-OID hydration and provenance.
+        acquisition_deadline = min(time.monotonic() + 180, self.deadline - CLEANUP_SECONDS)
+        self.set_transport_deadline(acquisition_deadline)
+        self.run("public-filtered-acquisition", self.control("acquire"), 180,
+            absolute_deadline=acquisition_deadline, environment=self.transport_environment)
+        tree = EXPECTED_SDK_TREE
+        self.receipt["sdk"] = {"publicURL": PUBLIC_URL, "revision": PUBLIC_PIN, "tree": tree,
+            "mirror": mirror.as_uri(), "fetchDepth": 1, "qualification": "development CI mirror only",
+            "closureBlobs": 73, "closureLogicalBytes": 709204, "lazyFetchAllowed": False}
         self.run("mirror-configure", ["swift", "package", "config", "set-mirror", "--original", PUBLIC_URL,
             "--mirror", mirror.as_uri()], 20)
         configured = self.run("mirror-readback", ["swift", "package", "config", "get-mirror", "--original", PUBLIC_URL], 20).decode().strip()
@@ -475,7 +588,8 @@ class Runner:
         scratch = self.work / "host-build"
         # The same 480 s budget now spans separately observable resolve/build/test
         # phases and their intervening provenance checks. No timeout is increased.
-        phase_deadline = time.monotonic() + HOST_PHASE_SECONDS
+        phase_deadline = min(time.monotonic() + HOST_PHASE_SECONDS, self.deadline - CLEANUP_SECONDS)
+        self.set_transport_deadline(phase_deadline)
         self.receipt["hostPhases"] = {"sharedSecondsBound": HOST_PHASE_SECONDS,
             "resourceAccountingScope": "cumulative reaped-child usage; incomplete for un-reaped descendants",
             "outputTimestampScope": "parent capture arrival time, not child emission time"}
@@ -485,29 +599,21 @@ class Runner:
             remaining = min(seconds, phase_deadline - time.monotonic())
             if remaining <= 0:
                 raise VerificationFailure("Shared resolution/build/test time bound exhausted before " + name)
-            return self.run(name, command, remaining, absolute_deadline=phase_deadline)
+            return self.run(name, command, remaining, absolute_deadline=phase_deadline,
+                environment=self.transport_environment)
 
-        phase("host-resolve", ["swift", "package", "--scratch-path", str(scratch), "--vv", "resolve"])
-        self.verify_consumed_sdk(scratch, tree, "prebuild", phase)
-        self.require_pin((self.root / "Package.resolved").read_bytes())
+        phase("host-resolve", ["swift", "package", "--scratch-path", str(scratch), "--disable-dependency-cache", "--vv", "resolve", "--skip-update"])
+        self.verify_checkpoint(scratch, tree, "prebuild", phase, before_sources)
         phase("host-build-tests", ["swift", "build", "--scratch-path", str(scratch), "--jobs", "2",
-            "--build-tests", "--disable-automatic-resolution", "--vv"])
-        self.verify_consumed_sdk(scratch, tree, "pretest", phase)
+            "--build-tests", "--disable-automatic-resolution", "--disable-dependency-cache", "--vv"])
+        self.verify_checkpoint(scratch, tree, "pretest", phase, before_sources)
         phase_tests = ["swift", "test", "--scratch-path", str(scratch), "--jobs", "2",
-            "--skip-build", "--disable-automatic-resolution"]
+            "--skip-build", "--disable-automatic-resolution", "--disable-dependency-cache"]
         tests = phase("host-tests", phase_tests)
         counts = re.findall(rb"Test run with ([0-9]{1,6}) tests(?: in [0-9]{1,6} suites)? passed after", tests)
         if counts != [str(EXPECTED_TESTS).encode()]:
             raise VerificationFailure("Expected exactly 38 executed Swift Testing functions")
-        checkout = scratch / "checkouts" / "mixer"
-        if not checkout.resolve().is_relative_to(scratch.resolve()):
-            raise VerificationFailure("Dependency checkout escapes owned CI work")
-        consumed = self.run("consumed-sdk-pin", ["git", "-C", str(checkout), "rev-parse", "HEAD"], 15).decode().strip()
-        consumed_tree = self.run("consumed-sdk-tree", ["git", "-C", str(checkout), "rev-parse", "HEAD^{tree}"], 15).decode().strip()
-        if consumed != PUBLIC_PIN or consumed_tree != tree:
-            raise VerificationFailure("Actually consumed SDK commit/tree differs")
-        if self.run("consumed-sdk-status", ["git", "-C", str(checkout), "status", "--porcelain", "--untracked-files=no"], 15).strip():
-            raise VerificationFailure("Consumed public SDK source changed")
+        self.verify_checkpoint(scratch, tree, "posttest", phase, before_sources)
         after_bytes = (self.root / "Package.resolved").read_bytes()
         after_lock = self.require_pin(after_bytes)
         (self.evidence / "Package.resolved.after.json").write_bytes(after_bytes)
@@ -519,16 +625,16 @@ class Runner:
         origin_hash_changed = before_lock["originHash"] != after_lock["originHash"]
         if lock_changed and not origin_hash_changed:
             raise VerificationFailure("Unexplained lock-byte change without originHash refresh")
-        after_sources = self.source_entries("after")
+        after_sources = self.source_entries("after", phase)
         protected_before = [v for v in before_sources if v["path"] != "Package.resolved"]
         protected_after = [v for v in after_sources if v["path"] != "Package.resolved"]
         if protected_before != protected_after:
             raise VerificationFailure("App source changed during verification")
-        final_status = self.run("app-status-after", ["git", "status", "--porcelain", "--untracked-files=normal"], 15).decode()
+        final_status = phase("app-status-after", [str(self.real_git), "status", "--porcelain", "--untracked-files=normal"], 15).decode()
         expected_status = " M Package.resolved\n" if lock_changed else ""
         if final_status != expected_status:
             raise VerificationFailure("Unexpected tracked or untracked application changes")
-        final_head = self.run("app-head-after", ["git", "rev-parse", "HEAD"], 15).decode().strip()
+        final_head = phase("app-head-after", [str(self.real_git), "rev-parse", "HEAD"], 15).decode().strip()
         if final_head != expected_sha:
             raise VerificationFailure("App HEAD changed during verification")
         self.receipt["lock"] = {"beforeSHA256": digest(before_bytes), "afterSHA256": digest(after_bytes),
@@ -536,9 +642,17 @@ class Runner:
             "originHashBefore": before_lock["originHash"], "originHashAfter": after_lock["originHash"],
             "canonicalLockResetOrCommitted": False}
         self.receipt["tests"] = {"expected": EXPECTED_TESTS, "observed": EXPECTED_TESTS, "failures": 0}
+        self.capture_transport()
+        if time.monotonic() >= phase_deadline:
+            raise VerificationFailure("Shared phase deadline expired during final provenance")
         self.receipt["status"] = "passed-development-host-only"
 
     def finish(self):
+        try:
+            self.capture_transport()
+        except BaseException:
+            self.receipt["errors"].append("Transport receipt: " + traceback.format_exc(limit=10))
+            self.receipt["status"] = "failed-development-host-only"
         self.receipt["endedAt"] = utc()
         self.receipt["wallSeconds"] = round(time.monotonic() - self.started, 3)
         self.receipt["capturedOutputBytes"] = self.output_bytes
