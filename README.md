@@ -93,23 +93,34 @@ Android execution, interpreted/OTA modes, physical regression and the remaining
 dogfood requirements stay open. No stable Mixer API or release tag is implied.
 
 See `verification/native-baseline-2026-10-22.json` for exact observed evidence and
-`scripts/verify.sh` for the separate repository's local CI entrypoint. No hosted
-CI execution or customer activity is claimed.
+`scripts/verify.sh` for the separate repository's local CI entrypoint. No customer
+activity is claimed.
 
-`.github/workflows/host.yml` is a prepared manual host-only workflow; it has not
-run. Once a separate FieldLog remote and dispatch are authorized, it invokes
-`scripts/verify-host-ci.py` on one disposable macOS runner. The remote-only script
-records each fresh child PID/PGID before admitting its command, reserves cleanup
-time, and requires direct-child reaping, exact owned-group absence and output
-EOF. It stops on ambiguous identity/cleanup and does not inspect previously held
-local resources. The total runner budget is 750 seconds, captured output is capped
-at 32 MiB, and host tests use two compiler jobs. No native builds or runtimes run.
+The private repository [snowdamiz/fieldlog](https://github.com/snowdamiz/fieldlog)
+is configured as `origin`. The shared task-editor and manual host-CI code was
+delivered in commit `70f3aa1d28f29e7c327a17fd46199480d41ca749`.
+The single manual [host workflow run 40744921829](https://github.com/snowdamiz/fieldlog/actions/runs/40744921829)
+targeted that exact commit and failed before runner assignment because GitHub
+reported failed account payments or a spending limit requiring an increase.
+**0 of 26 expected host test functions executed; no artifacts were produced.**
+No compiler, public SDK fetch, lock refresh or runner cleanup executed in that
+attempt. The earlier local Swift dependency-fetch attempt still has unverified
+cleanup; its held resources have not been inspected or reused.
 
-The workflow fetches only the existing public Mixer commit into a transient CI
-mirror and keeps the declared remote URL and immutable pin. It binds the actual
-consumed SDK commit/tree, all tracked app source and test results. A lock refresh
-may change only `originHash`, which is reported with before/after bytes; changed
-dependency identity/location/revision fails. This is development verification
-through a private CI mirror, not new published-release-package qualification.
-The app currently has no configured Git remote. No remote creation, push or
-workflow dispatch is implied by these prepared files.
+`.github/workflows/host.yml` is a manual host-only development workflow. When a
+runner is admitted, it invokes `scripts/verify-host-ci.py` on one disposable macOS
+runner. The remote-only script records each fresh child PID/PGID before admitting
+its command, reserves cleanup time, and requires direct-child reaping, exact
+owned-group absence and output EOF. It stops on ambiguous identity/cleanup and
+does not inspect previously held local resources. The total runner budget is
+750 seconds, captured output is capped at 32 MiB, and host tests use two compiler
+jobs. It does not invoke native builds or runtimes. These runner safeguards and
+the current host tests remain unexecuted in CI.
+
+The workflow is designed to fetch only the existing public Mixer commit into a
+transient CI mirror while keeping the declared remote URL and immutable pin. It
+binds the actual consumed SDK commit/tree, all tracked app source and test
+results. A lock refresh may change only `originHash`, which is reported with
+before/after bytes; changed dependency identity/location/revision fails. This
+development verification through a private CI mirror remains pending and does
+not establish new published-release-package qualification.

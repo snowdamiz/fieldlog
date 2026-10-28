@@ -41,5 +41,5 @@ external_packages:
     purpose: Shared task editor state, asynchronous save ownership, validated form document, event routing and navigation values
     distribution_mode: Immutable public Git source dependency, exact revision in both package locks
     ownership: First-party independently authored Mixer code; no third-party engine
-    qualification: Development API only; previous MixerCore host/simulator evidence retained, current MixerUI presentation tests pending after public dependency fetch timeout, full dogfood gates open
+    qualification: Development API only; private origin snowdamiz/fieldlog configured with code commit 70f3aa1d28f29e7c327a17fd46199480d41ca749; manual run 40744921829 blocked by GitHub billing/spending before runner assignment (0 of 26 host tests executed, no artifacts); earlier local Swift fetch cleanup remains unverified; previous MixerCore host/simulator evidence retained and full dogfood gates open
 provenance: Original app and tests independently authored; no competitor implementation or fixtures used.
