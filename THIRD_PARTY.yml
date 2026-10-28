@@ -35,11 +35,11 @@ dependencies:
     distribution_mode: Hosted CI actions; no action runtime redistributed with the app
     owner: FieldLog host development CI
 external_packages:
-  - name: MixerCore and MixerUI
+  - name: MixerCore, MixerUI and MixerApple
     origin: https://github.com/snowdamiz/mixer.git
-    revision: d8c6965a277ca21e685f3ef9e0f68a7d59b46156
-    purpose: Shared task editor state, asynchronous save ownership, validated form document, event routing and navigation values
+    revision: 56ff14c925168284761c5aca4f0bd4129cf3c995
+    purpose: Shared task editor state, asynchronous save ownership, validated form document, event routing, navigation values and partial public native fields rendering
     distribution_mode: Immutable public Git source dependency, exact revision in both package locks
     ownership: First-party independently authored Mixer code; no third-party engine
-    qualification: Development API only; private origin snowdamiz/fieldlog configured with code commit 70f3aa1d28f29e7c327a17fd46199480d41ca749; manual run 40744921829 blocked by GitHub billing/spending before runner assignment (0 of 26 host tests executed, no artifacts); earlier local Swift fetch cleanup remains unverified; previous MixerCore host/simulator evidence retained and full dogfood gates open
+    qualification: Development API only; snowdamiz/fieldlog is public under explicit user instruction; public baseline commit 4062256839c192645a9ba271d4244f482f9aa811 run 40762789024 compiled and executed 26 host tests with 25 passing and one whitespace-expectation failure, leaving consumed-SDK and post-test lock/source checks unreached; this slice corrects the test expectation and adds 12 Apple fields bridge tests, with all 38 integrated tests pending exact-commit host CI; historical private run 40744921829 had a billing/spending rejection before runner assignment (0 of 26 executed, no artifacts); earlier local Swift fetch cleanup remains unverified; native builds/rendering and immutable release-package, D0-D8 and GA qualification remain pending
 provenance: Original app and tests independently authored; no competitor implementation or fixtures used.

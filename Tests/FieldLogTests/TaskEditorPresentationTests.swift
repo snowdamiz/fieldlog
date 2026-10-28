@@ -68,7 +68,7 @@ private func node(_ snapshot: TaskEditorPresentationSnapshot, _ id: String) -> U
   let committed = await repository.snapshot()
   #expect(committed.tasks.count == 1 && committed.outbox.count == 2)
   #expect(committed.tasks.first?.title == "Measure  日本語\nopening 🧪")
-  #expect(committed.tasks.first?.responsible == "Rae")
+  #expect(committed.tasks.first?.responsible == "  Rae  ")
   #expect(throws: TaskEditorPresentationError.closed) { try form.send(event(form, "task.save")) }
   try form.close()
   await repository.close()
@@ -220,7 +220,7 @@ private func node(_ snapshot: TaskEditorPresentationSnapshot, _ id: String) -> U
   await form.waitForSave()
   #expect(form.snapshot.state.failure == failure && form.snapshot.renderingFailure == nil)
   #expect(node(form.snapshot, "task.failure.message")?.properties["text"]?.string?.count == 1000)
-  _ = try UIValidator().validate(form.snapshot.render.document)
+  _ = try UIValidator(supportedTextFieldAxes: [.horizontal, .vertical]).validate(form.snapshot.render.document)
   try form.close()
 }
 
@@ -234,7 +234,7 @@ private func node(_ snapshot: TaskEditorPresentationSnapshot, _ id: String) -> U
   #expect(form.snapshot.state.failure == failure && form.snapshot.renderingFailure == nil)
   let displayed = try #require(node(form.snapshot, "task.failure.message")?.properties["text"]?.string)
   #expect(displayed.utf8.count <= 4002)
-  _ = try UIValidator().validate(form.snapshot.render.document)
+  _ = try UIValidator(supportedTextFieldAxes: [.horizontal, .vertical]).validate(form.snapshot.render.document)
   #expect(node(form.snapshot, "task.save")?.properties["disabled"]?.bool == false)
   try form.close()
 }

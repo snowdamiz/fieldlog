@@ -35,7 +35,7 @@ public enum TaskEditorPresentationError: Error, Equatable, Sendable {
   public init(save: @escaping @Sendable (String, String) async -> TaskSaveResult) throws {
     let editor = try TaskEditor(save: save)
     let navigation = try NavigationState(routes: [NavigationRoute(id: "task.editor", name: "newTask")])
-    var reconciler = UIReconciler()
+    var reconciler = UIReconciler(validator: UIValidator(supportedTextFieldAxes: [.horizontal, .vertical]))
     try reconciler.apply(Self.document(editor.state, outcome: .editing, revision: 1))
     self.editor = editor
     self.reconciler = reconciler
@@ -140,7 +140,7 @@ public enum TaskEditorPresentationError: Error, Equatable, Sendable {
       MixerUI.List("task.form") {
         MixerUI.Section("task.fields", title: "Task") {
           MixerUI.TextField("task.title", "What needs to happen?", value: state.title,
-            action: "task.title.change").accessibilityIdentifier("task-title").disabled(inactive)
+            action: "task.title.change", axis: .vertical).accessibilityIdentifier("task-title").disabled(inactive)
           MixerUI.TextField("task.responsible", "Responsible person (optional)",
             value: state.responsible, action: "task.responsible.change").disabled(inactive)
         }

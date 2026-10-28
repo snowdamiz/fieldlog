@@ -3,6 +3,7 @@ import FieldLogFeatures
 import enum MixerUI.UIEventKind
 import enum MixerUI.UIValue
 import struct MixerUI.UINode
+import struct MixerUI.UIEventEnvelope
 import SwiftUI
 
 struct ProjectDetail: View {
@@ -179,86 +180,91 @@ struct ProjectDetail: View {
 
 private struct NewTaskView: View {
   @EnvironmentObject private var model: WorkspaceModel
-  @Environment(\.dismiss) private var dismiss
   let projectID: UUID
-  @State private var form: TaskEditorPresentationSnapshot?
-  @State private var editor: TaskEditorPresentation?
-  @State private var observation: UUID?
+  @State private var editor: TaskEditorAppleFieldsHost?
   @State private var editorError: String?
   var body: some View {
-    NavigationStack {
-      Form {
-        Section("Task") {
-          // Preserve the native multiline extension until the public renderer
-          // supports it. Values, labels, disabled state and every event come from
-          // the same validated MixerUI document used by shared consumers.
-          TextField(property("task.title", "label"), text: Binding(
-            get: { property("task.title", "value") },
-            set: { send("task.title", .textChange, .string($0)) }), axis: .vertical)
-            .accessibilityIdentifier("task-title").disabled(disabled("task.title"))
-          TextField(property("task.responsible", "label"), text: Binding(
-            get: { property("task.responsible", "value") },
-            set: { send("task.responsible", .textChange, .string($0)) }))
-            .disabled(disabled("task.responsible"))
-        }
-        if let error = editorError ?? form?.renderingFailure ?? node("task.failure.message")?.properties["text"]?.string {
-          Section { Label(error, systemImage: "exclamationmark.triangle").foregroundStyle(.red) }
-        }
-        Section {
-          Text(property("task.disclosure.message", "text")).font(.footnote).foregroundStyle(.secondary)
-        }
-      }.navigationTitle(property("task.screen", "title")).navigationBarTitleDisplayMode(.inline).toolbar {
-        ToolbarItem(placement: .cancellationAction) {
-          Button(property("task.cancel", "label")) { send("task.cancel", .activate) }
-            .disabled(disabled("task.cancel"))
-        }
-        ToolbarItem(placement: .confirmationAction) {
-          Button(property("task.save", "label")) { send("task.save", .activate) }
-            .disabled(disabled("task.save"))
+    Group {
+      if let editor {
+        NewTaskNativeForm(editor: editor)
+      } else {
+        NavigationStack {
+          Form {
+            if let editorError {
+              Section { Label(editorError, systemImage: "exclamationmark.triangle").foregroundStyle(.red) }
+            }
+          }.navigationTitle("New task").navigationBarTitleDisplayMode(.inline)
         }
       }
-    }.interactiveDismissDisabled(form?.state.saving == true)
-      .onAppear { startEditor() }
-      .onChange(of: form?.outcome) { _, outcome in
-        if outcome == .saved || outcome == .cancelled { dismiss() }
-      }
+    }.onAppear { startEditor() }
       .onDisappear {
-        if let observation { editor?.removeObserver(observation) }
         try? editor?.close()
-        editor = nil; observation = nil
+        editor = nil
       }
   }
   private func startEditor() {
     guard editor == nil else { return }
     do {
-      let feature = try TaskEditorPresentation { title, responsible in
+      editor = try TaskEditorAppleFieldsHost { title, responsible in
         if await model.addTask(projectID: projectID, title: title, responsible: responsible) { return .saved }
         return await .failed(model.saveError ?? "Task could not be saved. Your text has been kept.")
       }
-      observation = feature.observe { form = $0 }
-      editor = feature
       editorError = nil
     } catch { editorError = error.localizedDescription }
   }
-  private func send(_ nodeID: String, _ event: UIEventKind, _ value: UIValue = .null) {
-    guard let editor else { return }
-    do { try editor.send(nodeID: nodeID, event: event, value: value); editorError = nil }
-    catch { editorError = error.localizedDescription }
+}
+
+private struct NewTaskNativeForm: View {
+  @ObservedObject var editor: TaskEditorAppleFieldsHost
+  @Environment(\.dismiss) private var dismiss
+  var body: some View {
+    let form = editor.snapshot
+    NavigationStack {
+      Form {
+        // Public rendering is deliberately limited to the exact shared fields
+        // Section. The app keeps its native shell until that contract exists.
+        TaskEditorNativeFields(owner: editor)
+        if let error = editor.eventFailure ?? editor.adapterFailure ?? form.renderingFailure ?? node(form, "task.failure.message")?.properties["text"]?.string {
+          Section { Label(error, systemImage: "exclamationmark.triangle").foregroundStyle(.red) }
+        }
+        Section {
+          Text(property(form, "task.disclosure.message", "text")).font(.footnote).foregroundStyle(.secondary)
+        }
+      }.navigationTitle(property(form, "task.screen", "title")).navigationBarTitleDisplayMode(.inline).toolbar {
+        ToolbarItem(placement: .cancellationAction) {
+          Button(property(form, "task.cancel", "label")) { send(form, "task.cancel", .activate) }
+            .disabled(disabled(form, "task.cancel"))
+        }
+        ToolbarItem(placement: .confirmationAction) {
+          Button(property(form, "task.save", "label")) { send(form, "task.save", .activate) }
+            .disabled(disabled(form, "task.save"))
+        }
+      }
+    }.interactiveDismissDisabled(form.state.saving)
+      .onChange(of: form.outcome) { _, outcome in
+        if outcome == .saved || outcome == .cancelled { dismiss() }
+      }
   }
-  private func node(_ id: String) -> UINode? {
-    guard let root = form?.render.document.root else { return nil }
-    var pending = [root]
+  private func send(_ form: TaskEditorPresentationSnapshot, _ nodeID: String,
+    _ event: UIEventKind, _ value: UIValue = .null)
+  {
+    guard let identity = form.render.identity(for: nodeID) else { return }
+    editor.send(UIEventEnvelope(revision: form.render.document.revision,
+      identity: identity, event: event, value: value))
+  }
+  private func node(_ form: TaskEditorPresentationSnapshot, _ id: String) -> UINode? {
+    var pending = [form.render.document.root]
     while let value = pending.popLast() {
       if value.id == id { return value }
       pending.append(contentsOf: value.children)
     }
     return nil
   }
-  private func property(_ id: String, _ key: String) -> String {
-    node(id)?.properties[key]?.string ?? ""
+  private func property(_ form: TaskEditorPresentationSnapshot, _ id: String, _ key: String) -> String {
+    node(form, id)?.properties[key]?.string ?? ""
   }
-  private func disabled(_ id: String) -> Bool {
-    editor == nil || form?.renderingFailure != nil || node(id)?.properties["disabled"]?.bool != false
+  private func disabled(_ form: TaskEditorPresentationSnapshot, _ id: String) -> Bool {
+    editor.inputUnavailable || node(form, id)?.properties["disabled"]?.bool != false
   }
 }
 

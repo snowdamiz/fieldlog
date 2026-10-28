@@ -6,7 +6,7 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/snowdamiz/mixer.git",
       "state" : {
-        "revision" : "d8c6965a277ca21e685f3ef9e0f68a7d59b46156"
+        "revision" : "56ff14c925168284761c5aca4f0bd4129cf3c995"
       }
     }
   ],

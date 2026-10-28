@@ -24,8 +24,8 @@ import time
 import traceback
 
 PUBLIC_URL = "https://github.com/snowdamiz/mixer.git"
-PUBLIC_PIN = "d8c6965a277ca21e685f3ef9e0f68a7d59b46156"
-EXPECTED_TESTS = 26
+PUBLIC_PIN = "56ff14c925168284761c5aca4f0bd4129cf3c995"
+EXPECTED_TESTS = 38
 TOTAL_SECONDS = 750
 CLEANUP_SECONDS = 30
 OUTPUT_LIMIT = 32 * 1024 * 1024
@@ -415,7 +415,7 @@ class Runner:
         tests = self.run("host-tests", ["swift", "test", "--scratch-path", str(scratch), "--jobs", "2"], 480)
         counts = re.findall(rb"Test run with ([0-9]{1,6}) tests(?: in [0-9]{1,6} suites)? passed after", tests)
         if counts != [str(EXPECTED_TESTS).encode()]:
-            raise VerificationFailure("Expected exactly 26 executed Swift Testing functions")
+            raise VerificationFailure("Expected exactly 38 executed Swift Testing functions")
         checkout = scratch / "checkouts" / "mixer"
         if not checkout.resolve().is_relative_to(scratch.resolve()):
             raise VerificationFailure("Dependency checkout escapes owned CI work")
