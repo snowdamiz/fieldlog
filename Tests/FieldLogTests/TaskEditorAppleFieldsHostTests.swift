@@ -145,7 +145,7 @@ private func changingFields(_ document: MixerUI.UIDocument, _ change: (UINode) -
   #expect(owner.snapshot.outcome == .saved && owner.snapshot.navigation.routes.isEmpty)
   #expect(committed.tasks.count == 1 && committed.outbox.count == 2)
   #expect(committed.tasks.first?.title == "Inspect 日本語\nopening 🧪")
-  #expect(committed.tasks.first?.responsible == "Rae\n東京")
+  #expect(committed.tasks.first?.responsible == responsible)
   try owner.close()
   await repository.close()
   let reopened = try WorkspaceRepository(directory: folder)

@@ -15,6 +15,7 @@ import os
 from pathlib import Path
 import platform
 import re
+import resource
 import selectors
 import signal
 import stat
@@ -26,6 +27,9 @@ import traceback
 PUBLIC_URL = "https://github.com/snowdamiz/mixer.git"
 PUBLIC_PIN = "56ff14c925168284761c5aca4f0bd4129cf3c995"
 EXPECTED_TESTS = 38
+EXPECTED_SDK_TREE = "75989099938ed5256c4144cbc9e62979ee323183"
+HOST_PHASE_SECONDS = 480
+OUTPUT_TIMELINE_LIMIT = 512
 TOTAL_SECONDS = 750
 CLEANUP_SECONDS = 30
 OUTPUT_LIMIT = 32 * 1024 * 1024
@@ -53,6 +57,34 @@ def strict_json(data):
 
 def hex_value(value, count):
     return isinstance(value, str) and len(value) == count and all(c in "0123456789abcdef" for c in value)
+
+
+def observe_output(result, elapsed, offset, length):
+    """Bounded arrival metadata; offsets refer to unchanged captured log bytes."""
+    timeline = result.setdefault("outputTimeline", [])
+    if len(timeline) < OUTPUT_TIMELINE_LIMIT:
+        timeline.append({"elapsedSeconds": round(elapsed, 6), "offset": offset, "bytes": length})
+    else:
+        result["outputTimelineTruncated"] = True
+
+
+def resource_snapshot(path):
+    """Remote runner child accounting and filesystem capacity, never a process scan.
+
+    Child usage is cumulative accounting for reaped children and descendants
+    they reaped, not an inventory or proof of usage by every group member.
+    maxRSS is the platform's cumulative child high-water field, not a delta.
+    """
+    usage = resource.getrusage(resource.RUSAGE_CHILDREN)
+    disk = os.statvfs(path)
+    return {"at": utc(), "childrenUserSeconds": usage.ru_utime,
+            "childrenSystemSeconds": usage.ru_stime,
+            "childrenMaxRSSPlatformUnits": usage.ru_maxrss,
+            "childrenMajorFaults": usage.ru_majflt,
+            "childrenBlockInputs": usage.ru_inblock,
+            "childrenBlockOutputs": usage.ru_oublock,
+            "filesystemAvailableBytes": disk.f_bavail * disk.f_frsize,
+            "filesystemFreeInodes": disk.f_favail}
 
 
 class VerificationFailure(Exception):
@@ -92,7 +124,9 @@ class Runner:
             "schema": 1, "selection": SELECTION, "status": "running", "startedAt": utc(),
             "scope": "Separate FieldLog development host tests using an exact public source-commit CI mirror",
             "bounds": {"totalSeconds": TOTAL_SECONDS, "cleanupReserveSeconds": CLEANUP_SECONDS,
-                       "capturedOutputBytes": OUTPUT_LIMIT, "testJobs": 2},
+                       "capturedOutputBytes": OUTPUT_LIMIT, "testJobs": 2,
+                       "sharedResolveBuildTestSeconds": HOST_PHASE_SECONDS,
+                       "outputArrivalRecordsPerCommand": OUTPUT_TIMELINE_LIMIT},
             "python": sys.version, "host": platform.platform(),
             "runnerPID": os.getpid(), "runURL": "https://github.com/" + os.environ["GITHUB_REPOSITORY"]
                 + "/actions/runs/" + os.environ["GITHUB_RUN_ID"],
@@ -130,14 +164,15 @@ class Runner:
         except OSError as error:
             return "ambiguous-errno-" + str(error.errno)
 
-    def run(self, name, command, seconds, cwd=None):
+    def run(self, name, command, seconds, cwd=None, absolute_deadline=None):
         if self.cancel_signal or self.deadline - time.monotonic() <= CLEANUP_SECONDS:
             raise VerificationFailure("Cancelled or no execution budget remains before cleanup reserve")
         result = {"name": name, "command": command, "cwd": str(cwd or self.root),
                   "startedAt": utc(), "executionSecondsBound": seconds,
                   "spawnAttempted": False,
                   "childReaped": False, "ownedGroupAbsent": False, "pipeEOF": False,
-                  "identityVerified": False, "signals": [], "errors": []}
+                  "identityVerified": False, "signals": [], "errors": [],
+                  "outputTimeline": [], "resourceObservations": []}
         self.receipt["commands"].append(result)
         log = self.evidence / (name + ".log")
         process = None
@@ -199,6 +234,7 @@ class Runner:
                         return
                     remaining = OUTPUT_LIMIT - self.output_bytes
                     retained = block[:remaining]
+                    observe_output(result, time.monotonic() - started, output.tell(), len(retained))
                     output.write(retained)
                     output.flush()
                     self.output_bytes += len(retained)
@@ -225,6 +261,7 @@ class Runner:
                 observe_group()
 
         try:
+            result["resourceObservations"].append(resource_snapshot(self.work))
             output = log.open("wb")
             gate_read, gate_write = os.pipe()
             result["spawnAttempted"] = True
@@ -249,10 +286,13 @@ class Runner:
             if not result["identityVerified"]:
                 raise VerificationFailure("Fresh child has unexpected PGID; command remains unadmitted")
             selector.register(process.stdout, selectors.EVENT_READ)
+            if absolute_deadline is not None and time.monotonic() >= absolute_deadline:
+                raise VerificationFailure("Shared phase deadline exhausted before command admission")
             os.write(gate_write, b"G")
             os.close(gate_write)
             gate_write = None
-            execution_deadline = min(time.monotonic() + seconds, self.deadline - CLEANUP_SECONDS)
+            execution_deadline = min(time.monotonic() + seconds, self.deadline - CLEANUP_SECONDS,
+                absolute_deadline if absolute_deadline is not None else self.deadline)
             while time.monotonic() < execution_deadline:
                 if self.cancel_signal:
                     stop = "cancel-signal-" + str(self.cancel_signal)
@@ -319,6 +359,10 @@ class Runner:
                         close()
                     except BaseException:
                         result["errors"].append(label + " close: " + traceback.format_exc(limit=10))
+                try:
+                    result["resourceObservations"].append(resource_snapshot(self.work))
+                except BaseException:
+                    result["errors"].append("Resource observation: " + traceback.format_exc(limit=10))
                 result["stopReason"] = stop
                 result["endedAt"] = utc()
                 result["wallSeconds"] = round(time.monotonic() - started, 3)
@@ -373,6 +417,23 @@ class Runner:
             raise VerificationFailure("Invalid Package.resolved originHash")
         return value
 
+    def verify_consumed_sdk(self, scratch, tree, phase, run):
+        checkout = scratch / "checkouts" / "mixer"
+        if not checkout.resolve().is_relative_to(scratch.resolve()):
+            raise VerificationFailure("Dependency checkout escapes owned CI work")
+        consumed = run(phase + "-consumed-sdk-pin",
+            ["git", "-C", str(checkout), "rev-parse", "HEAD"], 15).decode().strip()
+        consumed_tree = run(phase + "-consumed-sdk-tree",
+            ["git", "-C", str(checkout), "rev-parse", "HEAD^{tree}"], 15).decode().strip()
+        if consumed != PUBLIC_PIN or consumed_tree != tree:
+            raise VerificationFailure("Actually consumed SDK commit/tree differs before " + phase)
+        if run(phase + "-consumed-sdk-status",
+            ["git", "-C", str(checkout), "status", "--porcelain", "--untracked-files=no"], 15).strip():
+            raise VerificationFailure("Consumed public SDK source changed before " + phase)
+        self.receipt.setdefault("consumptionCheckpoints", []).append({"phase": phase,
+            "revision": consumed, "tree": consumed_tree, "trackedWorkingTreeClean": True})
+        self.save()
+
     def verify(self):
         expected_sha = os.environ["GITHUB_SHA"]
         if not hex_value(expected_sha, 40):
@@ -402,7 +463,7 @@ class Runner:
         self.run("mirror-head", ["git", "-C", str(mirror), "symbolic-ref", "HEAD", "refs/heads/public-sdk-pin"], 15)
         actual_pin = self.run("mirror-pin", ["git", "-C", str(mirror), "rev-parse", "HEAD"], 15).decode().strip()
         tree = self.run("mirror-tree", ["git", "-C", str(mirror), "rev-parse", "HEAD^{tree}"], 15).decode().strip()
-        if actual_pin != PUBLIC_PIN or not hex_value(tree, 40):
+        if actual_pin != PUBLIC_PIN or tree != EXPECTED_SDK_TREE:
             raise VerificationFailure("Fetched public SDK differs from immutable pin")
         self.receipt["sdk"] = {"publicURL": PUBLIC_URL, "revision": actual_pin, "tree": tree,
             "mirror": mirror.as_uri(), "fetchDepth": 1, "qualification": "development CI mirror only"}
@@ -412,7 +473,29 @@ class Runner:
         if configured != mirror.as_uri():
             raise VerificationFailure("Transient package mirror readback differs")
         scratch = self.work / "host-build"
-        tests = self.run("host-tests", ["swift", "test", "--scratch-path", str(scratch), "--jobs", "2"], 480)
+        # The same 480 s budget now spans separately observable resolve/build/test
+        # phases and their intervening provenance checks. No timeout is increased.
+        phase_deadline = time.monotonic() + HOST_PHASE_SECONDS
+        self.receipt["hostPhases"] = {"sharedSecondsBound": HOST_PHASE_SECONDS,
+            "resourceAccountingScope": "cumulative reaped-child usage; incomplete for un-reaped descendants",
+            "outputTimestampScope": "parent capture arrival time, not child emission time"}
+        self.save()
+
+        def phase(name, command, seconds=HOST_PHASE_SECONDS):
+            remaining = min(seconds, phase_deadline - time.monotonic())
+            if remaining <= 0:
+                raise VerificationFailure("Shared resolution/build/test time bound exhausted before " + name)
+            return self.run(name, command, remaining, absolute_deadline=phase_deadline)
+
+        phase("host-resolve", ["swift", "package", "--scratch-path", str(scratch), "--vv", "resolve"])
+        self.verify_consumed_sdk(scratch, tree, "prebuild", phase)
+        self.require_pin((self.root / "Package.resolved").read_bytes())
+        phase("host-build-tests", ["swift", "build", "--scratch-path", str(scratch), "--jobs", "2",
+            "--build-tests", "--disable-automatic-resolution", "--vv"])
+        self.verify_consumed_sdk(scratch, tree, "pretest", phase)
+        phase_tests = ["swift", "test", "--scratch-path", str(scratch), "--jobs", "2",
+            "--skip-build", "--disable-automatic-resolution"]
+        tests = phase("host-tests", phase_tests)
         counts = re.findall(rb"Test run with ([0-9]{1,6}) tests(?: in [0-9]{1,6} suites)? passed after", tests)
         if counts != [str(EXPECTED_TESTS).encode()]:
             raise VerificationFailure("Expected exactly 38 executed Swift Testing functions")
@@ -463,6 +546,10 @@ class Runner:
         self.receipt["cleanupVerified"] = all(
             value.get("cleanupVerified") for value in self.receipt["commands"])
         host_log = self.evidence / "host-tests.log"
+        if not host_log.exists():
+            self.receipt["testObservation"] = {"expected": EXPECTED_TESTS,
+                "completedSummaries": [], "commandExitCode": None, "failures": None,
+                "incompleteOrFailedDetails": "Test phase not reached; inspect host-resolve/host-build-tests logs"}
         if host_log.exists():
             summaries = re.findall(rb"Test run with ([0-9]{1,6}) tests(?: in [0-9]{1,6} suites)? (passed|failed) after",
                 host_log.read_bytes())
