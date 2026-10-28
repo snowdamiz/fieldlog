@@ -264,7 +264,8 @@ def read_command(args, role, inventory):
     if role == "app":
         return args in [["rev-parse", "--show-toplevel"], ["rev-parse", "--is-inside-work-tree"],
             ["rev-parse", "--git-dir"], ["rev-parse", "HEAD"], ["rev-parse", "--verify", "HEAD"],
-            ["status", "--porcelain", "--untracked-files=no"]]
+            ["status", "--porcelain", "--untracked-files=no"],
+            ["describe", "--exact-match", "--tags"], ["status", "-s"]]
     if args in fixed:
         return True
     if len(args) == 3 and args[:2] == ["rev-parse", "--verify"]:
