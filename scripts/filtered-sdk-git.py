@@ -563,7 +563,12 @@ class Controller:
         return {"materialized": True, "files": len(found), "logicalBytes": sum(map(len, found.values()))}
 
     def hydrate(self, repo, source):
-        self.local(repo, ["fetch", "--no-tags", "--no-write-fetch-head", "--no-filter", source, *sorted(self.objects)])
+        # Explicit missing-object fetches must not advertise the shallow pin as
+        # complete. Keep promisor semantics while requesting only reviewed OIDs.
+        requested = ("\n".join(sorted(self.objects)) + "\n").encode("ascii")
+        self.local(repo, ["-c", "protocol.version=2", "-c", "fetch.negotiationAlgorithm=noop",
+            "fetch", "--no-tags", "--no-write-fetch-head", "--recurse-submodules=no",
+            "--filter=blob:none", "--stdin", "origin"], input_data=requested, packet=(source == "origin"))
         return self.metadata(repo, True)
 
     def acquire(self):
@@ -574,7 +579,7 @@ class Controller:
         if not re.fullmatch(r"git version [0-9]+\.[0-9]+(?:\.[0-9]+)?(?: \(Apple Git-[0-9.]+\))?", version):
             raise Reject("unrecognized real Git version")
         for args, tokens in [(["clone", "-h"], [b"--filter", b"--local"]),
-                (["fetch", "-h"], [b"--filter", b"--depth", b"--write-fetch-head", b"--tags"])]:
+                (["fetch", "-h"], [b"--filter", b"--depth", b"--write-fetch-head", b"--tags", b"--stdin"])]:
             out, err, _ = self.execute(args, accepted=(0, 129))
             if not set(tokens) <= help_options(out, err): raise Reject("real Git CLI lacks reviewed flags")
         _, advertised, _ = self.execute(["-c", "protocol.version=2", "ls-remote", URL, PIN], packet=True)
