@@ -13,12 +13,33 @@ dependencies:
     purpose: Foundation, SwiftUI, UIKit, PhotosUI, CoreTransferable, ImageIO, native sharing
     distribution_mode: System platform frameworks; no SDK redistribution
     owner: FieldLog native baseline
+  - name: Python 3 standard library
+    origin: https://www.python.org/
+    version: Remote runner provisioned Python 3; actual sys.version recorded in each CI receipt
+    license: Python Software Foundation License
+    purpose: Bounded host CI collection, exact owned-child cleanup and source/pin evidence
+    distribution_mode: CI platform tool; no Python packages or runtime redistributed with the app
+    owner: FieldLog host development CI
+  - name: Git
+    origin: https://git-scm.com/
+    version: Remote runner provisioned Git; actual git --version recorded in each CI receipt
+    license: GPL-2.0
+    purpose: Exact public-commit depth-one mirror and app/dependency source identity
+    distribution_mode: CI platform tool; no Git binary redistributed with the app
+    owner: FieldLog host development CI
+  - name: GitHub Actions checkout and artifact upload
+    origin: https://github.com/actions
+    version: checkout 11d5960a326750d5838078e36cf38b85af677262; upload-artifact ea165f8d65b6e75b540449e92b4886f43607fa02
+    license: MIT
+    purpose: Separate app checkout and bounded development-evidence retention
+    distribution_mode: Hosted CI actions; no action runtime redistributed with the app
+    owner: FieldLog host development CI
 external_packages:
-  - name: MixerCore
+  - name: MixerCore and MixerUI
     origin: https://github.com/snowdamiz/mixer.git
     revision: d8c6965a277ca21e685f3ef9e0f68a7d59b46156
-    purpose: Native task editor state, owned asynchronous save effects and lifecycle
+    purpose: Shared task editor state, asynchronous save ownership, validated form document, event routing and navigation values
     distribution_mode: Immutable public Git source dependency, exact revision in both package locks
     ownership: First-party independently authored Mixer code; no third-party engine
-    qualification: Development API only; initial host and simulator consumer evidence, full dogfood gates open
+    qualification: Development API only; previous MixerCore host/simulator evidence retained, current MixerUI presentation tests pending after public dependency fetch timeout, full dogfood gates open
 provenance: Original app and tests independently authored; no competitor implementation or fixtures used.

@@ -2,7 +2,7 @@
 
 An original native Swift iOS app for keeping project checklists, field notes and
 photos together. This repository began with an ordinary SwiftUI baseline. Its
-native task editor now consumes the public MixerCore package at an immutable Git
+native task editor now consumes public MixerCore and MixerUI packages at an immutable Git
 revision, with no dependency on a local Mixer checkout.
 
 The app opens an empty **offline workspace** without an account. Create a
@@ -67,19 +67,49 @@ it still does not establish real-user, authentication or store qualification.
 This is D0 groundwork, **not a passed D0 milestone**. Login/auth, a production
 backend, team synchronization/conflicts, camera capture, maps, push, purchases,
 real users/records, physical-device recordings/timings and store distributions
-remain required. The native task editor now consumes `MixerCore` from the public
+remain required. The native task editor now consumes `MixerCore` and `MixerUI` from the public
 Git repository at revision `d8c6965a277ca21e685f3ef9e0f68a7d59b46156`, through
 the separate `FieldLogFeatures` module. The public state/effect owner validates
 input, admits one save, preserves text after failure and rejects completions after
-the editor closes. Existing native controls and the serialized workspace repository
-remain in use. Cancellation does not undo a save already committed to disk.
+the editor closes. `TaskEditorPresentation` authors the form's shared MixerUI
+document and restorable route value. The actual native iOS form reads its labels,
+values and disabled state from that document and sends all edits/save/cancel
+through the public SDK's current-snapshot event validation. Navigation ends after
+confirmed durable save or unsaved cancel. Existing native controls preserve the
+vertical title field while the serialized workspace repository remains in use.
+Cancellation does not undo a save already committed to disk.
 
 Both SwiftPM and Xcode lock that remote revision; no Mixer checkout path or internal
-module is imported. Seventeen host tests and the original simulator workflow pass.
-This is initial external package consumption, not full MixerUI migration or D1
-acceptance. Android, interpreted/OTA modes, physical regression and the remaining
+module is imported. The previous seventeen-test host and original simulator
+receipts predate the shared presentation migration. New host/cross-build evidence
+is recorded separately; native runtime and UI checks are paused. This is public
+source-package consumption, not full MixerUI rendering migration or D1 acceptance.
+The published Apple renderer lacks the form's vertical title-field behavior and
+shared-theme consumption; the native extension preserves the existing behavior
+without claiming section8.3 parity. Android's current synchronous value-only
+reducer forbids the asynchronous fsynced persistence used here; a public
+effect/persistence host seam is required before this is a durable Android app flow.
+Android execution, interpreted/OTA modes, physical regression and the remaining
 dogfood requirements stay open. No stable Mixer API or release tag is implied.
 
 See `verification/native-baseline-2026-10-22.json` for exact observed evidence and
 `scripts/verify.sh` for the separate repository's local CI entrypoint. No hosted
 CI execution or customer activity is claimed.
+
+`.github/workflows/host.yml` is a prepared manual host-only workflow; it has not
+run. Once a separate FieldLog remote and dispatch are authorized, it invokes
+`scripts/verify-host-ci.py` on one disposable macOS runner. The remote-only script
+records each fresh child PID/PGID before admitting its command, reserves cleanup
+time, and requires direct-child reaping, exact owned-group absence and output
+EOF. It stops on ambiguous identity/cleanup and does not inspect previously held
+local resources. The total runner budget is 750 seconds, captured output is capped
+at 32 MiB, and host tests use two compiler jobs. No native builds or runtimes run.
+
+The workflow fetches only the existing public Mixer commit into a transient CI
+mirror and keeps the declared remote URL and immutable pin. It binds the actual
+consumed SDK commit/tree, all tracked app source and test results. A lock refresh
+may change only `originHash`, which is reported with before/after bytes; changed
+dependency identity/location/revision fails. This is development verification
+through a private CI mirror, not new published-release-package qualification.
+The app currently has no configured Git remote. No remote creation, push or
+workflow dispatch is implied by these prepared files.

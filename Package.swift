@@ -9,7 +9,7 @@ let package = Package(
     targets: [
         .target(name: "FieldLogModels"),
         .target(name: "FieldLogStorage", dependencies: ["FieldLogModels"]),
-        .target(name: "FieldLogFeatures", dependencies: ["FieldLogModels", .product(name: "MixerCore", package: "mixer")]),
-        .testTarget(name: "FieldLogTests", dependencies: ["FieldLogModels", "FieldLogStorage", "FieldLogFeatures"])
+        .target(name: "FieldLogFeatures", dependencies: ["FieldLogModels", .product(name: "MixerCore", package: "mixer"), .product(name: "MixerUI", package: "mixer")]),
+        .testTarget(name: "FieldLogTests", dependencies: ["FieldLogModels", "FieldLogStorage", "FieldLogFeatures", .product(name: "MixerUI", package: "mixer")])
     ]
 )

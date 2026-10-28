@@ -1,0 +1,38 @@
+name: FieldLog host development
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fieldlog-host-development
+  cancel-in-progress: false
+
+jobs:
+  host:
+    runs-on: macos-15
+    timeout-minutes: 15
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
+      TOOLCHAINS: com.apple.dt.toolchain.XcodeDefault
+      PYTHONUNBUFFERED: "1"
+      FIELDLOG_HOST_CI_SELECTION: public-pin-development-v1
+    steps:
+      - name: Check out the separate FieldLog commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Verify the exact public SDK pin and host behavior
+        timeout-minutes: 13
+        run: python3 -B scripts/verify-host-ci.py
+      - name: Retain bounded development evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: fieldlog-host-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/fieldlog-host-ci-evidence/**
+          if-no-files-found: error
+          retention-days: 14
