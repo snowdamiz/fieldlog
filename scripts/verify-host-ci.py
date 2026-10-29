@@ -651,8 +651,84 @@ class Runner:
         if path.exists():
             self.receipt.setdefault("transport", {})["finalState"] = strict_json(TRANSPORT.regular(path, 1024 * 1024))
 
+    @staticmethod
+    def require_app_declaration(data, location):
+        app = strict_json(data)
+        expected = [{"sourceControl": [{"identity": "mixer",
+            "location": {"remote": [{"urlString": location}]}, "productFilter": None,
+            "requirement": {"revision": [PUBLIC_PIN]}, "traits": [{"name": "default"}]}]}]
+        if not isinstance(app, dict) or app.get("dependencies") != expected:
+            raise VerificationFailure("Real SwiftPM app dependency declaration differs")
+        targets = app.get("targets")
+        if (app.get("name") != "FieldLog" or app.get("traits") != []
+                or not isinstance(targets, list) or any(not isinstance(t, dict) for t in targets)
+                or sorted(t.get("name", "") for t in targets) != ["FieldLogFeatures", "FieldLogModels", "FieldLogStorage", "FieldLogTests"]):
+            raise VerificationFailure("Real SwiftPM app target/trait declaration differs")
+        return app
+
+    def prepare_mirror_configuration(self):
+        # Isolate both local and shared mirror inputs. An empty local mapping
+        # otherwise falls back to shared SwiftPM configuration before set-mirror.
+        if "SWIFTPM_MIRROR_CONFIG" in os.environ:
+            raise VerificationFailure("Inherited SwiftPM mirror override is not admitted")
+        self.swiftpm_config = self.work / "swiftpm-configuration"
+        self.mirror_config = self.work / "mirrors.json"
+        TRANSPORT.nofollow(self.swiftpm_config, missing=True)
+        if self.swiftpm_config.exists():
+            raise VerificationFailure("Fresh owned SwiftPM configuration is required")
+        self.swiftpm_config.mkdir(mode=0o700)
+        self.transport_environment["SWIFTPM_MIRROR_CONFIG"] = str(self.mirror_config)
+        self.verify_mirror_configuration(False)
+
+    def verify_mirror_configuration(self, configured):
+        # Do not infer identity from a file: scheme or accept extra mappings.
+        if self.transport_environment.get("SWIFTPM_MIRROR_CONFIG") != str(self.mirror_config):
+            raise VerificationFailure("Owned SwiftPM mirror override changed")
+        shared = TRANSPORT.nofollow(self.swiftpm_config / "mirrors.json", missing=True)
+        local = TRANSPORT.nofollow(self.mirror_config, missing=True)
+        if shared.exists() or (not configured and local.exists()):
+            raise VerificationFailure("Unexpected SwiftPM mirror configuration")
+        if not configured:
+            return None
+        data = TRANSPORT.regular(local, 65536)
+        value = strict_json(data)
+        expected = {"version": 1, "object": [{"original": PUBLIC_URL,
+            "mirror": (self.work / "mixer.git").as_uri()}]}
+        if not isinstance(value, dict) or type(value.get("version")) is not int or value != expected:
+            raise VerificationFailure("Exact owned SwiftPM mirror mapping differs")
+        previous = self.receipt.get("mirrorConfiguration", {}).get("sha256")
+        if previous is not None and digest(data) != previous:
+            raise VerificationFailure("Owned SwiftPM mirror configuration bytes changed")
+        return data
+
+    def verify_public_app_declaration(self, scratch, phase):
+        self.verify_mirror_configuration(False)
+        data = phase("premirror-app-declaration", ["swift", "package", "--scratch-path", str(scratch),
+            "--disable-dependency-cache", "dump-package"])
+        self.verify_mirror_configuration(False)
+        self.require_app_declaration(data, PUBLIC_URL)
+        self.public_app_declaration = data
+        self.receipt["publicAppDeclaration"] = {"sha256": digest(data), "publicURL": PUBLIC_URL,
+            "revision": PUBLIC_PIN, "dependencyTraits": [{"name": "default"}],
+            "observedBeforeMirrorConfiguration": True, "sharedMirrorConfigurationAbsent": True}
+        self.save()
+
+    def require_mirrored_app_declaration(self, data):
+        self.verify_mirror_configuration(True)
+        public = getattr(self, "public_app_declaration", None)
+        if public is None:
+            raise VerificationFailure("Unmirrored public app declaration was not observed")
+        expected = self.require_app_declaration(public, PUBLIC_URL)
+        mirror = (self.work / "mixer.git").as_uri()
+        app = self.require_app_declaration(data, mirror)
+        expected["dependencies"][0]["sourceControl"][0]["location"] = {"remote": [{"urlString": mirror}]}
+        if json.dumps(app, sort_keys=True, separators=(",", ":"), allow_nan=False) != \
+                json.dumps(expected, sort_keys=True, separators=(",", ":"), allow_nan=False):
+            raise VerificationFailure("App declaration changed beyond the exact owned mirror mapping")
+
     def verify_checkpoint(self, scratch, tree, name, phase, before_sources):
         # All of these operations consume the original shared 480-second clock.
+        self.verify_mirror_configuration(True)
         self.verify_consumed_sdk(scratch, tree, name, phase)
         phase(name + "-filtered-closure", self.control("checkpoint", name))
         checkpoint_lock = self.require_pin(TRANSPORT.regular(self.root / "Package.resolved", 1024 * 1024))
@@ -672,16 +748,12 @@ class Runner:
             raise VerificationFailure("Real SwiftPM SDK plugin/target declaration differs")
         app_declaration = phase(name + "-app-declaration", ["swift", "package", "--scratch-path", str(scratch),
             "--disable-dependency-cache", "dump-package"])
-        app = strict_json(app_declaration)
-        expected_dependency = [{"identity": "mixer", "location": {"remote": [{"urlString": PUBLIC_URL}]},
-            "productFilter": None, "requirement": {"revision": [PUBLIC_PIN]}}]
-        deps = app.get("dependencies")
-        if not isinstance(deps, list) or len(deps) != 1 or deps[0].get("sourceControl") != expected_dependency:
-            raise VerificationFailure("Real SwiftPM app public dependency declaration differs")
-        if app.get("name") != "FieldLog" or sorted(t.get("name", "") for t in app.get("targets", [])) != ["FieldLogFeatures", "FieldLogModels", "FieldLogStorage", "FieldLogTests"]:
-            raise VerificationFailure("Real SwiftPM app target declaration differs")
+        self.require_mirrored_app_declaration(app_declaration)
         self.receipt.setdefault("declarationCheckpoints", []).append({"phase": name,
             "sdkDumpSHA256": digest(declaration), "appDumpSHA256": digest(app_declaration),
+            "publicAppDumpSHA256": digest(self.public_app_declaration),
+            "mirrorConfigurationSHA256": self.receipt["mirrorConfiguration"]["sha256"],
+            "onlyExactOwnedMirrorMappingChanged": True,
             "sdkTargets": 9, "sdkExternalDependencies": 0, "sdkPlugins": 0,
             "lockOriginHash": checkpoint_lock["originHash"], "appSourcesUnchanged": True})
         self.save()
@@ -707,6 +779,7 @@ class Runner:
         self.run("swift-version", ["swift", "--version"], 20)
         self.run("xcode-version", ["xcodebuild", "-version"], 20)
         self.prepare_transport()
+        self.prepare_mirror_configuration()
         self.run("git-version", [str(self.real_git), "--version"], 15)
         self.run("mirror-help", ["swift", "package", "config", "set-mirror", "--help"], 20)
         mirror = self.work / "mixer.git"
@@ -720,14 +793,9 @@ class Runner:
         self.receipt["sdk"] = {"publicURL": PUBLIC_URL, "revision": PUBLIC_PIN, "tree": tree,
             "mirror": mirror.as_uri(), "fetchDepth": 1, "qualification": "development CI mirror only",
             "closureBlobs": 73, "closureLogicalBytes": 709204, "lazyFetchAllowed": False}
-        self.run("mirror-configure", ["swift", "package", "config", "set-mirror", "--original", PUBLIC_URL,
-            "--mirror", mirror.as_uri()], 20)
-        configured = self.run("mirror-readback", ["swift", "package", "config", "get-mirror", "--original", PUBLIC_URL], 20).decode().strip()
-        if configured != mirror.as_uri():
-            raise VerificationFailure("Transient package mirror readback differs")
         scratch = self.work / "host-build"
-        # The same 480 s budget now spans separately observable resolve/build/test
-        # phases and their intervening provenance checks. No timeout is increased.
+        # The same 480 s budget also includes the public declaration and mirror
+        # configuration before resolve/build/test. No timeout is increased.
         phase_deadline = min(time.monotonic() + HOST_PHASE_SECONDS, self.deadline - CLEANUP_SECONDS)
         self.set_transport_deadline(phase_deadline)
         self.receipt["hostPhases"] = {"sharedSecondsBound": HOST_PHASE_SECONDS,
@@ -739,9 +807,23 @@ class Runner:
             remaining = min(seconds, phase_deadline - time.monotonic())
             if remaining <= 0:
                 raise VerificationFailure("Shared resolution/build/test time bound exhausted before " + name)
+            if command[:2] in (["swift", "package"], ["swift", "build"], ["swift", "test"]):
+                command = command[:2] + ["--config-path", str(self.swiftpm_config)] + command[2:]
             return self.run(name, command, remaining, absolute_deadline=phase_deadline,
                 environment=self.transport_environment)
 
+        self.verify_public_app_declaration(scratch, phase)
+        phase("mirror-configure", ["swift", "package", "config", "set-mirror", "--original", PUBLIC_URL,
+            "--mirror", mirror.as_uri()], 20)
+        configured = phase("mirror-readback", ["swift", "package", "config", "get-mirror", "--original", PUBLIC_URL], 20)
+        if configured.decode().strip() != mirror.as_uri():
+            raise VerificationFailure("Transient package mirror readback differs")
+        mirror_bytes = self.verify_mirror_configuration(True)
+        (self.evidence / "mirrors.configured.json").write_bytes(mirror_bytes)
+        self.receipt["mirrorConfiguration"] = {"path": str(self.mirror_config), "sha256": digest(mirror_bytes),
+            "readbackSHA256": digest(configured), "original": PUBLIC_URL, "mirror": mirror.as_uri(),
+            "sharedConfigurationPath": str(self.swiftpm_config), "exactSingleMapping": True}
+        self.save()
         phase("host-resolve", ["swift", "package", "--scratch-path", str(scratch), "--disable-dependency-cache", "--vv", "resolve", "--skip-update"])
         self.verify_checkpoint(scratch, tree, "prebuild", phase, before_sources)
         phase("host-build-tests", ["swift", "build", "--scratch-path", str(scratch), "--jobs", "2",
