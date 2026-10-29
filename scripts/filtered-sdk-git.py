@@ -923,6 +923,34 @@ class Controller:
         if sum(len(x) for x in args) > 32768 or len(args) > 256 or any("\x00" in x or "\n" in x for x in args):
             raise Reject("argv bounds")
         self.store.event({"event": "swiftpm-git-request", "argv": args, "cwd": str(cwd)})
+        virtual_queries = [["-C", "/", "describe", "--exact-match", "--tags"],
+            ["-C", "/", "rev-parse", "--verify", "HEAD"]]
+        if args in virtual_queries:
+            # SwiftPM 6.2.4 evaluates the repository file-view manifest at
+            # /Package.swift. Its optional GitInformation caller catches the
+            # failed tag/revision queries. Deny explicitly; never inspect / or
+            # claim a real Git result, and never soften other transport errors.
+            s = self.store.state
+            repository = str(self.work / "host-build/repositories/mixer-27f26b57")
+            marker = s.get("virtualManifestMetadata")
+            owner = os.environ.get("FIELDLOG_TRANSPORT_PGID")
+            if (canonical(cwd) != canonical(self.config["app"])
+                    or s["metadataFetches"] != 1 or s["publicHydrations"] != 1
+                    or s["repositoryClones"] != 1 or s["checkoutClones"] != 0
+                    or s["repository"] != repository
+                    or s["ready"].get(repository) is not True
+                    or s["ready"].get(str(self.work / "mixer.git")) is not True
+                    or marker != {"repository": repository, "manifestSHA256": MANIFEST_SHA,
+                        "owner": owner, "nextQuery": virtual_queries.index(args)}):
+                raise Reject("virtual manifest metadata denial requires exact audited read/caller/stage")
+            # The adapter still joins the unchanged fsynced nomination/ACK
+            # protocol, even though this denial creates no inner Git child.
+            admit_adapter_group(self.config, self.store, self.execute.custody_nonce)
+            marker["nextQuery"] += 1
+            self.store.event({"event": "virtual-manifest-metadata-unavailable", "argv": args,
+                "manifestSHA256": MANIFEST_SHA, "exitCode": 125, "innerGitExecuted": False,
+                "result": "adapter-policy-denial", "filesystemRootAccess": False})
+            return b"", b"FILTERED-TRANSPORT UNAVAILABLE: optional virtual-manifest Git metadata denied; no Git executed\n", 125
         if args[:1] == ["clone"]: return self.clone(args)
         if args == ["--version"] or args == ["check-ref-format", "--allow-onelevel", PIN]:
             return self.execute(args)
@@ -962,7 +990,18 @@ class Controller:
             self.worktree(repo)
             return result
         if not read_command(tail, "owned", inventory): raise Reject("unknown Git network/write/read invocation")
-        return self.execute(["-C", str(repo), *tail], accepted=tuple(range(256)))
+        result = self.execute(["-C", str(repo), *tail], accepted=tuple(range(256)))
+        manifest = next(e for e in self.entries if e["path"] == "Package.swift")
+        if (str(repo) == self.store.state["repository"] and tail == ["cat-file", "-p", manifest["oid"]]
+                and result[2] == 0):
+            if sha(result[0]) != MANIFEST_SHA:
+                raise Reject("actual SwiftPM manifest read differs from public pin")
+            if self.store.state["checkoutClones"] == 0 and "virtualManifestMetadata" not in self.store.state:
+                self.store.state["virtualManifestMetadata"] = {"repository": str(repo),
+                    "manifestSHA256": MANIFEST_SHA, "owner": os.environ.get("FIELDLOG_TRANSPORT_PGID"), "nextQuery": 0}
+                self.store.event({"event": "virtual-manifest-read-verified", "repository": str(repo),
+                    "manifestSHA256": MANIFEST_SHA})
+        return result
 
 def load_config():
     if os.environ.get("GITHUB_ACTIONS") != "true" or os.environ.get("FIELDLOG_HOST_CI_SELECTION") != SELECTION:
