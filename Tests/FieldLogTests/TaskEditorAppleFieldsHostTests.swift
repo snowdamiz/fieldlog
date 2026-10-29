@@ -28,6 +28,10 @@ private actor AppleFieldsSaveGate {
   func finish(_ result: TaskSaveResult) { continuation?.resume(returning: result); continuation = nil }
 }
 
+@MainActor private final class AppleFieldsProjectionFailure {
+  var shouldReject = false
+}
+
 @MainActor private func fieldsEvent(_ render: UIRenderSnapshot, _ nodeID: String,
   _ kind: UIEventKind = .textChange, _ value: UIValue = .string("Next")) throws -> UIEventEnvelope
 {
@@ -268,12 +272,12 @@ private func changingFields(_ document: MixerUI.UIDocument, _ change: (UINode) -
 @Test @MainActor func appleFieldsFailedProjectionPreparationKeepsOwnershipVisibleValuesAndRejectsEffects() async throws {
   let gate = AppleFieldsSaveGate()
   let form = try TaskEditorPresentation { await gate.save($0, $1) }
-  var rejectProjection = false
+  let projectionFailure = AppleFieldsProjectionFailure()
   var projected: [MixerUI.UIDocument] = []
   var updated: [MixerUI.UIDocument] = []
   let owner = try TaskEditorAppleFieldsHost(presentation: form, project: { document in
     projected.append(document)
-    if rejectProjection { throw TaskEditorAppleFieldsError.projectionMismatch }
+    if projectionFailure.shouldReject { throw TaskEditorAppleFieldsError.projectionMismatch }
     return try TaskEditorAppleFieldsHost.fieldsDocument(document)
   }, update: { host, document in
     updated.append(document)
@@ -289,7 +293,7 @@ private func changingFields(_ document: MixerUI.UIDocument, _ change: (UINode) -
   let before = owner.snapshot
   let preparedCount = projected.count, installedCount = updated.count
   let retainedTitle = "  Keep 日本語\npreparation 🧪  "
-  rejectProjection = true
+  projectionFailure.shouldReject = true
   try applyFieldsAction(owner, "task.title", retainedTitle)
 
   #expect(projected.count == preparedCount + 1 && projected.last == owner.snapshot.render.document)
