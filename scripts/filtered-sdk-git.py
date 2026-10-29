@@ -3,9 +3,10 @@
 
 SwiftPM owns its repositories and checkout. This adapter replaces only its two
 known clone forms, explicitly primes the fixed public package, and rejects every
-other Git write/network invocation. Its children inherit the outer Runner group;
-only that Runner can signal the group. Inner timeouts fail the whole phase and
-leave descendant cleanup to the unchanged outer custody protocol.
+other Git write/network invocation. Before Git starts, the outer Runner admits
+only inherited groups or explicitly registered, verified SwiftPM adapter groups.
+SwiftPM cancellation keeps its original group; outer Runner owns final cleanup.
+Inner timeouts fail the whole phase. No adapter changes process group/session.
 """
 from __future__ import annotations
 import fcntl
@@ -357,9 +358,244 @@ class Store:
         self.state["maxOwnedLogicalBytes"] = max(stats["logicalBytes"], self.state["maxOwnedLogicalBytes"])
         return stats
 
+class CustodyFile:
+    """A bounded nomination inbox, never a process-discovery mechanism."""
+    def __init__(self, path, deadline):
+        self.path, self.deadline = nofollow(path), deadline
+        self.lock_path = nofollow(str(path) + ".lock")
+
+    def update(self, edit):
+        descriptor = os.open(self.lock_path, os.O_RDWR | os.O_NOFOLLOW)
+        try:
+            # A crashed writer releases flock; a busy writer never blocks a deadline.
+            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            state = json_value(regular(self.path, 1024 * 1024))
+            result = edit(state)
+            raw = json.dumps(state, sort_keys=True).encode()
+            if len(raw) > 1024 * 1024:
+                raise Reject("custody metadata byte bound")
+            temporary = str(self.path) + ".saving"
+            target = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
+            with os.fdopen(target, "wb") as output:
+                output.write(raw)
+                output.flush()
+                os.fsync(output.fileno())
+            os.replace(temporary, self.path)
+            return result
+        finally:
+            os.close(descriptor)
+
+
+def custody_identity():
+    """Only this adapter, its direct parent, and the declared owner are observed."""
+    pid, parent = os.getpid(), os.getppid()
+    result = {"pid": pid, "ppid": parent}
+    for key, operation in [("pgid", os.getpgrp), ("sid", lambda: os.getsid(0)),
+            ("parentPGID", lambda: os.getpgid(parent)), ("parentSID", lambda: os.getsid(parent))]:
+        try:
+            result[key] = operation()
+        except OSError as error:
+            result[key] = None
+            result.setdefault("observationErrors", []).append(key + ": " + str(error)[:200])
+    return result
+
+
+def valid_custody_identity(identity, owner, inherited=False):
+    keys = {"pid", "pgid", "sid", "ppid", "parentPGID", "parentSID"}
+    if set(identity) != keys or any(type(identity[k]) is not int or identity[k] <= 1 for k in keys):
+        raise Reject("invalid self custody identity")
+    if identity["sid"] != owner or owner <= 1:
+        raise Reject("adapter outside declared owned session")
+    if inherited and identity["pgid"] == owner:
+        return
+    if identity["pid"] == owner or identity["pgid"] != identity["pid"]:
+        raise Reject("adapter is not a fresh nested group leader")
+    if identity["parentPGID"] != owner or identity["parentSID"] != owner:
+        raise Reject("adapter direct parent outside declared outer group/session")
+
+
+class CustodyOwner:
+    """Outer-runner custody of explicitly nominated SwiftPM adapter groups.
+
+    The runner alone admits groups and performs final cleanup. SwiftPM retains
+    its existing cancellation target because neither adapters nor Git children
+    change their group or session.
+    """
+    def __init__(self, path, binding, deadline, record):
+        self.path, self.binding, self.deadline, self.record = path, binding, deadline, record
+        self.owner = None
+        self.groups = {}
+        self.closed = False
+        self.ambiguous = False
+        self.errors = []
+        for name, raw in [(str(path) + ".lock", b""), (str(path), json.dumps({
+                "schema": 1, "binding": binding, "owner": None, "open": False, "requests": {}}).encode())]:
+            descriptor = os.open(name, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+            with os.fdopen(descriptor, "wb") as output:
+                output.write(raw)
+                output.flush()
+                os.fsync(output.fileno())
+        self.file = CustodyFile(path, deadline)
+
+    def start(self, owner):
+        if type(owner) is not int or owner <= 1 or self.owner is not None:
+            raise Reject("invalid or repeated custody owner")
+        self.owner = owner
+        def begin(state):
+            state.update(owner=owner, open=True)
+        self.file.update(begin)
+
+    def close(self):
+        def close_admission(state):
+            if state["owner"] != self.owner or state["binding"] != self.binding:
+                raise Reject("custody registry binding differs at close")
+            state["open"] = False
+        self.file.update(close_admission)
+        self.closed = True
+
+    def poll(self):
+        def inspect(state):
+            if state["owner"] != self.owner or state["binding"] != self.binding or len(state["requests"]) > 512:
+                raise Reject("custody registry binding/count differs")
+            for key, request in state["requests"].items():
+                if request["state"] != "pending":
+                    continue
+                identity = request["identity"]
+                valid_custody_identity(identity, self.owner)
+                pid = identity["pid"]
+                nonce = request.get("nonce", "")
+                if (not isinstance(nonce, str) or not re.fullmatch(r"[0-9a-f]{32}", nonce)
+                        or key != str(pid) + "-" + nonce or pid in self.groups):
+                    raise Reject("duplicate or malformed custody nomination")
+                # Validate the exact nominated process and its declared parent.
+                # No process enumeration, ancestry walk, or inferred adoption.
+                try:
+                    current = {"pgid": os.getpgid(pid), "sid": os.getsid(pid),
+                        "parentPGID": os.getpgid(identity["ppid"]), "parentSID": os.getsid(identity["ppid"])}
+                except ProcessLookupError:
+                    request["state"] = "unadmitted-identity-gone"
+                    continue
+                if any(current[k] != identity[k] for k in current):
+                    self.ambiguous = True
+                    request["state"] = "held-identity-mismatch"
+                    raise Reject("nominated nested group identity differs")
+                self.groups[pid] = {"pid": pid, "pgid": pid, "sid": self.owner, "absent": False}
+                self.record({"event": "nested-group-owned-before-admission", **identity,
+                             "admitted": not self.closed, "binding": self.binding, "requestKey": key})
+                request["state"] = "closed-owned" if self.closed else "admitted"
+        self.file.update(inspect)
+
+    def group_state(self, group):
+        item = self.groups[group]
+        if item["absent"]:
+            return "absent"
+        try:
+            # The group leader may have exited with surviving children. On
+            # macOS getsid(group) then cannot establish identity: hold, no signal.
+            if os.getpgid(group) != group or os.getsid(group) != self.owner:
+                self.ambiguous = True
+                return "ambiguous-identity"
+            os.killpg(group, 0)
+            return "present"
+        except ProcessLookupError:
+            try:
+                os.killpg(group, 0)
+            except ProcessLookupError:
+                item["absent"] = True
+                self.cleanup_record({"event": "nested-group-absent", "pgid": group, "sid": self.owner})
+                return "absent"
+            except OSError:
+                pass
+            self.ambiguous = True
+            return "ambiguous-leader-gone"
+        except OSError:
+            self.ambiguous = True
+            return "ambiguous-permission"
+
+    def signal(self, number):
+        if not self.closed:
+            raise Reject("custody admission must close before outer cleanup")
+        for group in self.groups:
+            if self.group_state(group) != "present":
+                continue
+            try:
+                os.killpg(group, number)
+                self.cleanup_record({"event": "nested-group-signal", "pgid": group, "sid": self.owner, "signal": number})
+            except ProcessLookupError:
+                self.group_state(group)
+            except OSError as error:
+                self.ambiguous = True
+                self.errors.append("nested signal: " + repr(error))
+
+    def cleanup_record(self, event):
+        try:
+            self.record(event)
+        except BaseException as error:
+            self.errors.append("nested cleanup journal: " + repr(error))
+
+    def absent(self):
+        states = [self.group_state(group) for group in self.groups]
+        return self.closed and not self.ambiguous and all(state == "absent" for state in states)
+
+
+def admit_adapter_group(config, store, nonce):
+    identity = custody_identity()
+    # Persist self facts even on rejection, before any child can be created.
+    store.event({"event": "adapter-self-custody", **identity})
+    store.save()
+    owner = int(os.environ["FIELDLOG_TRANSPORT_PGID"])
+    if int(os.environ["FIELDLOG_TRANSPORT_SID"]) != owner:
+        raise Reject("declared owner group/session differ")
+    path = nofollow(os.environ["FIELDLOG_TRANSPORT_CUSTODY"])
+    if path.parent != canonical(config["work"]) or not re.fullmatch(r"custody-[0-9]+\.json", path.name):
+        raise Reject("unexpected custody path")
+    if path.lstat().st_uid != os.getuid():
+        raise Reject("custody owner UID differs")
+    binding = sha(regular(os.environ["FIELDLOG_TRANSPORT_CONFIG"], 65536))
+    registry = CustodyFile(path, config["deadline"])
+    valid_custody_identity(identity, owner, inherited=True)
+    inherited = identity["pgid"] == owner
+    if not isinstance(nonce, str) or not re.fullmatch(r"[0-9a-f]{32}", nonce):
+        raise Reject("invalid adapter lifetime nonce")
+    key = str(identity["pid"]) + "-" + nonce
+    wait_deadline = min(config["deadline"], time.monotonic() + 2)
+    while time.monotonic() < wait_deadline:
+        def request(state):
+            if state["schema"] != 1 or state["owner"] != owner or state["binding"] != binding:
+                raise Reject("custody owner/config binding differs")
+            if not state["open"]:
+                raise Reject("outer custody admission closed")
+            if inherited:
+                return True
+            old = state["requests"].get(key)
+            if old is None:
+                if len(state["requests"]) >= 512:
+                    raise Reject("custody group count bound")
+                state["requests"][key] = {"identity": identity, "nonce": nonce, "state": "pending"}
+                return False
+            if old["identity"] != identity or old["state"] not in {"pending", "admitted"}:
+                raise Reject("nested custody request rejected or changed")
+            return old["state"] == "admitted"
+        try:
+            admitted = registry.update(request)
+        except BlockingIOError:
+            admitted = False
+        if admitted:
+            current = custody_identity()
+            if current != identity or time.monotonic() >= config["deadline"]:
+                raise Reject("adapter identity/deadline changed after admission")
+            store.event({"event": "adapter-group-admitted", **identity, "owner": owner,
+                         "kind": "inherited" if inherited else "registered-nested"})
+            store.save()
+            return identity["pgid"]
+        time.sleep(min(0.01, max(0, wait_deadline - time.monotonic())))
+    raise Reject("bounded nested custody admission timed out")
+
+
 class Executor:
     def __init__(self, config, store):
         self.config, self.store = config, store
+        self.custody_nonce = os.urandom(16).hex()
 
     def __call__(self, args, input_data=None, accepted=(0,), packet=False):
         # No shell, no detached inner session, no retry and no unbounded wait.
@@ -367,9 +603,7 @@ class Executor:
             raise Reject("bounded inner input protocol")
         if time.monotonic() >= self.config["deadline"]:
             raise Reject("shared transport/host deadline expired")
-        expected_group = int(os.environ["FIELDLOG_TRANSPORT_PGID"])
-        if expected_group <= 1 or os.getpgrp() != expected_group:
-            raise Reject("adapter did not inherit outer owned group")
+        expected_group = admit_adapter_group(self.config, self.store, self.custody_nonce)
         if signature(self.config["git"]["path"]) != self.config["git"]:
             raise Reject("trusted Git identity changed")
         env = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
@@ -377,6 +611,7 @@ class Executor:
             "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": "/dev/null", "GIT_OPTIONAL_LOCKS": "0"})
         if packet: env["GIT_TRACE_PACKET"] = "1"
         env["FIELDLOG_TRANSPORT_INNER"] = "1"
+        env["FIELDLOG_TRANSPORT_EXEC_PGID"] = str(expected_group)
         gate_read = gate_write = None
         process = None
         collector = None
@@ -395,7 +630,7 @@ class Executor:
                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, pass_fds=(gate_read,), start_new_session=False)
             os.close(gate_read)
             gate_read = None
-            identity = os.getpgid(process.pid) == expected_group
+            identity = os.getpgid(process.pid) == expected_group and os.getsid(process.pid) == int(os.environ["FIELDLOG_TRANSPORT_SID"])
             # fsync before releasing the inner child. It cannot exec Git earlier.
             self.store.event({"event": "inner-created-before-execution", "pid": process.pid,
                 "inheritedPGID": expected_group, "identityVerified": identity, "argv": args})
@@ -726,8 +961,11 @@ def inner_entry(arguments):
     descriptor = int(arguments[0])
     try: admitted = os.read(descriptor, 1) == b"G"
     finally: os.close(descriptor)
-    group = int(os.environ["FIELDLOG_TRANSPORT_PGID"])
-    if not admitted or os.getpgrp() != group or group <= 1 or time.monotonic() >= config["deadline"]:
+    group = int(os.environ["FIELDLOG_TRANSPORT_EXEC_PGID"])
+    owner = int(os.environ["FIELDLOG_TRANSPORT_PGID"])
+    if (not admitted or os.getpgrp() != group or group <= 1 or owner <= 1
+            or int(os.environ["FIELDLOG_TRANSPORT_SID"]) != owner or os.getsid(0) != owner
+            or time.monotonic() >= config["deadline"]):
         return 125
     os.execve(config["git"]["path"], [config["git"]["path"], *arguments[1:]], os.environ.copy())
     return 125

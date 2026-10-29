@@ -3,7 +3,9 @@
 
 Each command starts in a fresh owned session. An inherited pipe holds its launcher
 until PID/PGID identity has been written and synced. Cleanup observes/signals only
-that exact group, reaps the direct child, and requires group absence plus pipe EOF.
+that exact group and explicitly admitted adapter groups, reaps the direct child,
+and requires all recorded group absences plus pipe EOF. This does not inventory
+or prove custody of other SwiftPM/compiler descendants.
 Nothing in this file resolves any previously held local process or resource.
 """
 from __future__ import annotations
@@ -109,6 +111,7 @@ def child_entry(arguments):
         return 125
     environment = os.environ.copy()
     environment["FIELDLOG_TRANSPORT_PGID"] = str(os.getpgrp())
+    environment["FIELDLOG_TRANSPORT_SID"] = str(os.getsid(0))
     os.execvpe(arguments[1], arguments[1:], environment)
     return 125
 
@@ -187,6 +190,8 @@ class Runner:
         output = None
         gate_read = gate_write = None
         group = None
+        custody = None
+        custody_drained = False
         started = time.monotonic()
         stop = None
         capture_failed = False
@@ -271,6 +276,13 @@ class Runner:
             result["resourceObservations"].append(resource_snapshot(self.work))
             output = log.open("wb")
             gate_read, gate_write = os.pipe()
+            if environment and environment.get("FIELDLOG_TRANSPORT_CONFIG"):
+                environment = environment.copy()
+                custody_path = self.work / ("custody-" + str(len(self.receipt["commands"])) + ".json")
+                binding = digest(TRANSPORT.regular(environment["FIELDLOG_TRANSPORT_CONFIG"], 65536))
+                custody = TRANSPORT.CustodyOwner(custody_path, binding, self.deadline,
+                    lambda event: self.record({"command": name, **event}))
+                environment["FIELDLOG_TRANSPORT_CUSTODY"] = str(custody_path)
             result["spawnAttempted"] = True
             process = subprocess.Popen(
                 [sys.executable, "-B", str(Path(__file__).resolve()), "--owned-child", str(gate_read), *command],
@@ -283,15 +295,18 @@ class Runner:
             result["pid"] = process.pid
             result["ownedPGID"] = group
             result["observedPGID"] = os.getpgid(process.pid)
-            result["identityVerified"] = result["observedPGID"] == group
+            result["observedSID"] = os.getsid(process.pid)
+            result["identityVerified"] = result["observedPGID"] == group and result["observedSID"] == group
             # This fsynced record precedes releasing the command or any wait/read.
             self.record({"command": name, "event": "created-before-execution",
                          "pid": process.pid, "ownedPGID": group,
-                         "observedPGID": result["observedPGID"],
+                         "observedPGID": result["observedPGID"], "observedSID": result["observedSID"],
                          "identityVerified": result["identityVerified"]})
             self.save()
             if not result["identityVerified"]:
                 raise VerificationFailure("Fresh child has unexpected PGID; command remains unadmitted")
+            if custody is not None:
+                custody.start(group)
             selector.register(process.stdout, selectors.EVENT_READ)
             if absolute_deadline is not None and time.monotonic() >= absolute_deadline:
                 raise VerificationFailure("Shared phase deadline exhausted before command admission")
@@ -304,6 +319,11 @@ class Runner:
                 if self.cancel_signal:
                     stop = "cancel-signal-" + str(self.cancel_signal)
                     break
+                if custody is not None:
+                    try:
+                        custody.poll()
+                    except BlockingIOError:
+                        pass  # The bounded loop retries; no child is admitted by this branch.
                 state_path = self.work / "transport-state.json"
                 if state_path.exists() and strict_json(TRANSPORT.regular(state_path, 1024 * 1024)).get("failed"):
                     stop = "filtered-transport-failed-no-retry"
@@ -328,27 +348,48 @@ class Runner:
                     except OSError as error:
                         result["errors"].append("Gate close: " + repr(error))
             cleanup_deadline = min(time.monotonic() + CLEANUP_SECONDS, self.deadline)
+            if custody is not None and custody.owner is not None:
+                try:
+                    close_deadline = min(cleanup_deadline, time.monotonic() + 1)
+                    while time.monotonic() < close_deadline:
+                        try:
+                            custody.close()
+                            custody.poll()  # Validate pending nominations for cleanup, without admission.
+                            custody_drained = True
+                            break
+                        except BlockingIOError:
+                            time.sleep(0.01)
+                    if not custody.closed or not custody_drained:
+                        raise VerificationFailure("Nested admission closure and final nomination scan unverified")
+                except BaseException:
+                    result["errors"].append("Nested custody close: " + traceback.format_exc(limit=10))
             try:
                 reap()
                 if process is not None and result["identityVerified"]:
                     state = observe_group()
-                    if state == "present":
+                    if custody is not None and custody.closed:
+                        custody.signal(signal.SIGTERM)
+                    if state == "present" or (custody is not None and not custody.absent()):
                         send_owned(signal.SIGTERM)
                         term_deadline = min(time.monotonic() + 25, cleanup_deadline - 5)
                         while time.monotonic() < term_deadline:
                             drain(0.05, cleanup=True)
                             reap()
-                            if observe_group() != "present":
+                            if observe_group() != "present" and (custody is None or custody.absent()):
                                 break
-                        if observe_group() == "present" and time.monotonic() < cleanup_deadline:
-                            send_owned(signal.SIGKILL)
+                        if time.monotonic() < cleanup_deadline:
+                            if custody is not None and custody.closed:
+                                custody.signal(signal.SIGKILL)
+                            if observe_group() == "present":
+                                send_owned(signal.SIGKILL)
                     while time.monotonic() < cleanup_deadline:
                         drain(0.05, cleanup=True)
                         reap()
                         state = observe_group()
                         if state.startswith("ambiguous"):
                             break
-                        if result["childReaped"] and result["ownedGroupAbsent"] and result["pipeEOF"]:
+                        if (result["childReaped"] and result["ownedGroupAbsent"] and result["pipeEOF"]
+                                and (custody is None or custody.absent())):
                             break
                 elif process is not None:
                     # Only the direct child may be reaped; identity ambiguity
@@ -378,8 +419,15 @@ class Runner:
                 result["endedAt"] = utc()
                 result["wallSeconds"] = round(time.monotonic() - started, 3)
                 result["cleanupNotRequired"] = not result["spawnAttempted"]
+                result["nestedAdmissionClosedAndDrained"] = custody is None or (custody.closed and custody_drained)
+                result["registeredGroupsAbsent"] = custody is None or custody.absent()
+                result["registeredGroups"] = [] if custody is None else list(custody.groups.values())
+                if custody is not None:
+                    result["errors"].extend(custody.errors)
+                result["cleanupScope"] = "recorded outer and registered adapter groups; no complete descendant inventory"
                 result["cleanupVerified"] = result["cleanupNotRequired"] or all(result[key] for key in
-                    ("identityVerified", "childReaped", "ownedGroupAbsent", "pipeEOF"))
+                    ("identityVerified", "childReaped", "ownedGroupAbsent", "pipeEOF", "registeredGroupsAbsent",
+                     "nestedAdmissionClosedAndDrained"))
                 if log.exists():
                     result["outputBytes"] = log.stat().st_size
                     result["outputSHA256"] = digest(log.read_bytes())
@@ -492,7 +540,8 @@ class Runner:
                 "packageLogicalBytes": 1048576, "innerAggregateCapturedOutputBytes": TRANSPORT.OUTPUT_LIMIT,
                 "outerAggregateCapturedOutputBytes": OUTPUT_LIMIT, "events": 8192,
                 "repositoryClones": 1, "checkoutClones": 3},
-            "processCustody": "inner children inherit outer owned group; no inner group/session creation",
+            "processCustody": "Git children inherit an outer or explicitly registered SwiftPM adapter group; adapter never changes group/session; outer Runner owns final cleanup",
+            "custodyScope": "recorded groups only; other SwiftPM/compiler descendants are not inventoried",
             "noLazyFetch": True, "workspaceStateFabricated": False, "alternatesFabricated": False,
             "packByteScope": "stored pack bytes; network wire bytes not measured",
             "capabilityOrDirectOIDWantFailure": "one experiment failure; no automatic fallback or retry"}
