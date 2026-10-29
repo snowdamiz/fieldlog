@@ -254,6 +254,20 @@ def clone_shape(args, work, repository):
     command = CLONE_PREFIX + options + [source, str(dest)] + (["--progress"] if progress else [])
     return kind, origin, dest, command
 
+def absent_repository_destination(repo, work):
+    # The one pre-clone destination observed in the selected SwiftPM host run.
+    # Do not generalize absence into authority for other paths or Git commands.
+    repo = canonical(repo)
+    if repo != canonical(work) / "host-build/repositories/mixer-27f26b57":
+        return False
+    nofollow(repo.parent)  # Only the final repository component may be absent.
+    nofollow(repo, missing=True)
+    try:
+        repo.lstat()
+    except FileNotFoundError:
+        return True
+    return False
+
 def read_command(args, role, inventory):
     """Exact read-only classes; no option, config injection or arbitrary revision."""
     fixed = [["remote"], ["config", "--get", "remote.origin.url"], ["tag", "-l"], ["branch", "-l"],
@@ -913,6 +927,22 @@ class Controller:
         if args == ["--version"] or args == ["check-ref-format", "--allow-onelevel", PIN]:
             return self.execute(args)
         repo, tail = (canonical(args[1]), args[2:]) if len(args) >= 3 and args[0] == "-C" else (canonical(cwd), args)
+        if (args == ["-C", str(repo), "rev-parse", "--git-dir"]
+                and absent_repository_destination(repo, self.work)):
+            s = self.store.state
+            if (s["repository"] is not None or s["repositoryClones"] != 0
+                    or s["metadataFetches"] != 1 or s["publicHydrations"] != 1
+                    or s["ready"].get(str(repo)) or not s["ready"].get(str(self.work / "mixer.git"))):
+                raise Reject("absent repository probe requires audited pre-clone state")
+            # Executor starts in the existing app directory. Let real Git handle
+            # the explicit -C failure under the unchanged ownership/child gate.
+            result = self.execute(args, accepted=(128,))
+            expected = ("fatal: cannot change to '" + str(repo) + "': No such file or directory\n").encode()
+            if result != (b"", expected, 128) or not absent_repository_destination(repo, self.work):
+                raise Reject("unexpected absent repository probe result or path change")
+            self.store.event({"event": "absent-repository-probe", "repository": str(repo),
+                "exitCode": 128, "repositoryCreated": False, "result": "expected-git-enoent"})
+            return result
         nofollow(repo)
         if repo == canonical(self.config["app"]):
             if not read_command(tail, "app", {}): raise Reject("unknown app Git request")
