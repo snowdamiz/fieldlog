@@ -402,12 +402,16 @@ def custody_identity():
 
 def valid_custody_identity(identity, owner, inherited=False):
     keys = {"pid", "pgid", "sid", "ppid", "parentPGID", "parentSID"}
-    if set(identity) != keys or any(type(identity[k]) is not int or identity[k] <= 1 for k in keys):
+    if set(identity) != keys or any(type(identity[k]) is not int or
+            identity[k] < (1 if k == "parentSID" else 2) for k in keys):
         raise Reject("invalid self custody identity")
     if identity["sid"] != owner or owner <= 1:
         raise Reject("adapter outside declared owned session")
     if inherited and identity["pgid"] == owner:
+        # The already-owned outer session may have a parent in system session 1.
         return
+    if identity["parentSID"] <= 1:
+        raise Reject("invalid self custody identity")
     if identity["pid"] == owner or identity["pgid"] != identity["pid"]:
         raise Reject("adapter is not a fresh nested group leader")
     if identity["parentPGID"] != owner or identity["parentSID"] != owner:
