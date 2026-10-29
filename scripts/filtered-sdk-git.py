@@ -33,6 +33,9 @@ CLONE_PREFIX = ["clone", "-c", "core.symlinks=true", "-c", "core.fsmonitor=false
 SPARSE = b"/Package.swift\n/sdk/\n"
 STORAGE_LIMIT = 512 * 1024 * 1024
 OUTPUT_LIMIT = 16 * 1024 * 1024
+INNER_AGGREGATE_OUTPUT_LIMIT = 64 * 1024 * 1024
+INNER_CLEANUP_SECONDS = 1
+INNER_CLEANUP_DRAIN_BYTES = 1024 * 1024
 SAMPLE_SECONDS = 0.1
 OID = re.compile(r"[0-9a-f]{40}\Z")
 REPO_NAME = re.compile(r"mixer-[0-9a-f]{8}\Z")
@@ -636,6 +639,8 @@ class Executor:
         stdout, stderr = bytearray(), bytearray()
         started = time.monotonic()
         ended = False
+        direct_child_reaped = False
+        pipes_registered = False
         identity = False
         logs_written = False
         log_number = self.store.state["events"] + 1
@@ -657,6 +662,7 @@ class Executor:
                 raise Reject("inner identity/deadline; command unadmitted")
             collector.register(process.stdout, selectors.EVENT_READ, stdout)
             collector.register(process.stderr, selectors.EVENT_READ, stderr)
+            pipes_registered = True
             os.write(gate_write, b"G")
             os.close(gate_write)
             gate_write = None
@@ -680,10 +686,13 @@ class Executor:
                         collector.unregister(key.fileobj)
                     else:
                         self.store.state["outputBytes"] += len(block)
-                        if self.store.state["outputBytes"] > OUTPUT_LIMIT:
+                        if self.store.state["outputBytes"] > INNER_AGGREGATE_OUTPUT_LIMIT:
                             raise Reject("aggregate inner command output bound")
+                        if len(stdout) + len(stderr) + len(block) > OUTPUT_LIMIT:
+                            raise Reject("single inner command output bound")
                         key.data.extend(block)
                 code = process.poll()
+                direct_child_reaped = code is not None
                 if code is not None and not collector.get_map():
                     ended = True
                     break
@@ -705,25 +714,88 @@ class Executor:
                 raise Reject("Git command failed (no retry): " + str(code) + " " + repr(args))
             return bytes(stdout), bytes(stderr), code
         finally:
+            original_error = sys.exc_info()[1]
+            cleanup_errors = []
+            discarded = 0
+            pipe_eof = False
+            def attempt(label, action):
+                try:
+                    return action()
+                except BaseException as error:
+                    cleanup_errors.append(label + ": " + repr(error)[:512])
             for descriptor in (gate_read, gate_write):
-                if descriptor is not None: os.close(descriptor)
-            if collector is not None: collector.close()
+                if descriptor is not None:
+                    attempt("gate close", lambda descriptor=descriptor: os.close(descriptor))
             if process is not None:
+                if process.stdin is not None and not process.stdin.closed:
+                    attempt("stdin close", process.stdin.close)
+                # A bound or evidence failure must not skip direct-child/EOF
+                # accounting. This passive path neither observes nor signals a
+                # group, and does not retain additional command output.
+                cleanup_deadline = min(self.config["deadline"], time.monotonic() + INNER_CLEANUP_SECONDS)
+                for _ in range(128):
+                    try:
+                        if process.poll() is not None:
+                            direct_child_reaped = True
+                        pipe_eof = pipes_registered and not collector.get_map()
+                        if direct_child_reaped and pipe_eof:
+                            break
+                        if time.monotonic() >= cleanup_deadline:
+                            break
+                        if pipes_registered and not pipe_eof and discarded < INNER_CLEANUP_DRAIN_BYTES:
+                            for key, _ in collector.select(timeout=min(0.05, max(0, cleanup_deadline - time.monotonic()))):
+                                remaining = INNER_CLEANUP_DRAIN_BYTES - discarded
+                                if not remaining:
+                                    break
+                                block = os.read(key.fd, min(65536, remaining))
+                                if not block:
+                                    collector.unregister(key.fileobj)
+                                discarded += len(block)
+                        else:
+                            time.sleep(min(0.01, max(0, cleanup_deadline - time.monotonic())))
+                    except BaseException as error:
+                        cleanup_errors.append("passive reap/drain: " + repr(error)[:512])
+                        break
+                # One final nonblocking direct-child reap is independent of
+                # drain, close and journal failures. It never proves group absence.
+                try:
+                    if process.poll() is not None:
+                        direct_child_reaped = True
+                except BaseException as error:
+                    cleanup_errors.append("final direct reap: " + repr(error)[:512])
+                if collector is not None and pipes_registered:
+                    pipe_eof = attempt("EOF accounting", lambda: not collector.get_map()) is True
                 for stream in (process.stdin, process.stdout, process.stderr):
-                    if stream is not None and not stream.closed: stream.close()
+                    if stream is not None and not stream.closed:
+                        attempt("stream close", stream.close)
                 if not logs_written:
                     # Retain bounded partial diagnostics for timeout/storage/
                     # identity failures too. This never skips outer cleanup.
                     for suffix, data in [("stdout", stdout), ("stderr", stderr)]:
-                        path = self.store.evidence / (str(log_number) + "." + suffix + ".partial.log")
-                        descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
-                        with os.fdopen(descriptor, "wb") as output: output.write(data)
+                        def partial_log(suffix=suffix, data=data):
+                            path = self.store.evidence / (str(log_number) + "." + suffix + ".partial.log")
+                            descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+                            with os.fdopen(descriptor, "wb") as output: output.write(data)
+                        attempt("partial " + suffix, partial_log)
                 # Never signal the shared outer group or wait without a bound.
                 # On error it may still exist; failing the phase invokes Runner cleanup.
-                self.store.event({"event": "inner-protocol-exit", "pid": process.pid,
-                    "identityVerified": identity, "directChildReaped": ended,
+                attempt("protocol exit journal", lambda: self.store.event({"event": "inner-protocol-exit", "pid": process.pid,
+                    "identityVerified": identity, "directChildReaped": direct_child_reaped,
+                    "exitCode": process.returncode if direct_child_reaped else None,
+                    "pipeEOF": pipe_eof, "cleanupDiscardedBytes": discarded,
+                    "cleanupSecondsBound": INNER_CLEANUP_SECONDS,
+                    "cleanupDrainBytesBound": INNER_CLEANUP_DRAIN_BYTES,
+                    "cleanupErrors": list(cleanup_errors),
                     "groupDetached": False, "cleanupAuthority": "outer Runner",
-                    "partialStdoutBytes": len(stdout), "partialStderrBytes": len(stderr)})
+                    "partialStdoutBytes": len(stdout), "partialStderrBytes": len(stderr)}))
+            if collector is not None:
+                attempt("collector close", collector.close)
+            if cleanup_errors:
+                detail = "inner cleanup/evidence: " + "; ".join(cleanup_errors)
+                if original_error is not None:
+                    original_error.add_note(detail)
+                else:
+                    raise Reject(detail)
 
 class Controller:
     def __init__(self, config, store, execute=None):

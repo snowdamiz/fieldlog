@@ -36,6 +36,7 @@ HOST_PHASE_SECONDS = 480
 OUTPUT_TIMELINE_LIMIT = 512
 TOTAL_SECONDS = 750
 CLEANUP_SECONDS = 30
+PASSIVE_CLEANUP_SECONDS = 1
 OUTPUT_LIMIT = 16 * 1024 * 1024
 SELECTION = "filtered-public-pin-host-v1"
 TRANSPORT_SPEC = importlib.util.spec_from_file_location("fieldlog_filtered_transport", Path(__file__).with_name("filtered-sdk-git.py"))
@@ -182,7 +183,14 @@ class Runner:
                   "spawnAttempted": False,
                   "childReaped": False, "ownedGroupAbsent": False, "pipeEOF": False,
                   "identityVerified": False, "signals": [], "errors": [],
-                  "outputTimeline": [], "resourceObservations": []}
+                  "outputTimeline": [], "resourceObservations": [],
+                  "outputReadBytes": 0, "outputRetainedBytesConfirmed": 0,
+                  "outputDiscardedBytes": 0, "outputSinkUnconfirmedBytes": 0,
+                  "sinkFailureBlockBytes": 0, "sinkDiscardBytes": 0,
+                  "sinkDiscardIterations": 0,
+                  "sinkDiscardBounds": {"seconds": PASSIVE_CLEANUP_SECONDS,
+                      "bytes": 1024 * 1024, "iterations": 128,
+                      "initialFailureBlockBytes": 65_536}}
         self.receipt["commands"].append(result)
         log = self.evidence / (name + ".log")
         process = None
@@ -194,7 +202,10 @@ class Runner:
         custody_drained = False
         started = time.monotonic()
         stop = None
-        capture_failed = False
+        pipe_failed = False
+        pipe_registered = False
+        sink_failed = False
+        sink_deadline = None
         reaping_failed = False
 
         def record_cleanup(event):
@@ -219,7 +230,11 @@ class Runner:
         def observe_group():
             if result["ownedGroupAbsent"]:
                 return "absent"
+            if result.get("heldGroupState"):
+                return result["heldGroupState"]
             state = self.group_state(group)
+            if state.startswith("ambiguous"):
+                result["heldGroupState"] = state
             if state != result.get("lastGroupState"):
                 record_cleanup({"command": name, "ownedPGID": group, "groupState": state})
                 result["lastGroupState"] = state
@@ -228,35 +243,97 @@ class Runner:
             return state
 
         def drain(wait, cleanup=False):
-            nonlocal capture_failed
-            if capture_failed:
-                if not cleanup:
-                    raise VerificationFailure("Output collector failed")
+            nonlocal pipe_failed, sink_failed, sink_deadline, pipe_registered, stop
+            if pipe_failed or not pipe_registered or result["pipeEOF"]:
                 time.sleep(min(wait, 0.05))
                 return
-            if result["pipeEOF"]:
-                time.sleep(min(wait, 0.05))
-                return
+            if sink_failed:
+                if cleanup:
+                    sink_deadline = min(sink_deadline, cleanup_deadline)
+                # The first failed block is accounted separately below. These
+                # bounds cover subsequent passive discard, never another write.
+                if not result.get("sinkDiscardBoundReached"):
+                    if time.monotonic() >= sink_deadline:
+                        result["sinkDiscardBoundReached"] = "seconds"
+                    elif result["sinkDiscardIterations"] >= 128:
+                        result["sinkDiscardBoundReached"] = "iterations"
+                    elif result["sinkDiscardBytes"] >= 1024 * 1024:
+                        result["sinkDiscardBoundReached"] = "bytes"
+                if result.get("sinkDiscardBoundReached"):
+                    time.sleep(min(wait, 0.05))
+                    return
+                result["sinkDiscardIterations"] += 1
+                wait = min(wait, max(0, sink_deadline - time.monotonic()))
+            sink_exception = False
             try:
-                for key, _ in selector.select(timeout=max(0, wait)):
-                    block = os.read(key.fileobj.fileno(), 65_536)
+                ready = selector.select(timeout=max(0, wait))
+                for key, _ in ready:
+                    if not pipe_registered or key.fileobj is not process.stdout:
+                        raise VerificationFailure("Output selector returned an unregistered owned pipe")
+                    read_limit = 65_536
+                    if sink_failed:
+                        if time.monotonic() >= sink_deadline:
+                            result["sinkDiscardBoundReached"] = "seconds"
+                            return
+                        read_limit = min(read_limit, 1024 * 1024 - result["sinkDiscardBytes"])
+                        if read_limit <= 0:
+                            result["sinkDiscardBoundReached"] = "bytes"
+                            return
+                    block = os.read(key.fileobj.fileno(), read_limit)
                     if not block:
-                        selector.unregister(key.fileobj)
+                        # Only an actual empty read of the registered pipe is
+                        # EOF. Child/group state and collector failures are not.
                         result["pipeEOF"] = True
+                        pipe_registered = False
+                        selector.unregister(key.fileobj)
                         return
-                    remaining = OUTPUT_LIMIT - self.output_bytes
+                    result["outputReadBytes"] += len(block)
+                    if sink_failed:
+                        result["sinkDiscardBytes"] += len(block)
+                        result["outputDiscardedBytes"] += len(block)
+                        continue
+                    remaining = max(0, OUTPUT_LIMIT - self.output_bytes)
                     retained = block[:remaining]
-                    observe_output(result, time.monotonic() - started, output.tell(), len(retained))
-                    output.write(retained)
-                    output.flush()
+                    stage = "tell"
+                    try:
+                        offset = output.tell()
+                        stage = "write"
+                        written = output.write(retained)
+                        if written != len(retained):
+                            raise OSError("Short output log write")
+                        stage = "flush"
+                        output.flush()
+                    except BaseException:
+                        sink_failed = True
+                        sink_deadline = min(self.deadline, time.monotonic() + PASSIVE_CLEANUP_SECONDS)
+                        stop = stop or "output-sink-error"
+                        result["outputSinkFailure"] = stage
+                        result["sinkFailureBlockBytes"] = len(block)
+                        # A failed write/flush may have persisted an unknown
+                        # prefix. It is neither confirmed retention nor discard.
+                        uncertain = 0 if stage == "tell" else len(retained)
+                        result["outputSinkUnconfirmedBytes"] += uncertain
+                        result["outputDiscardedBytes"] += len(block) - uncertain
+                        if not cleanup:
+                            sink_exception = True
+                            raise
+                        result["errors"].append("Cleanup output sink: " + traceback.format_exc(limit=10))
+                        return
                     self.output_bytes += len(retained)
+                    result["outputRetainedBytesConfirmed"] += len(retained)
+                    result["outputDiscardedBytes"] += len(block) - len(retained)
+                    observe_output(result, time.monotonic() - started, offset, len(retained))
                     if len(retained) != len(block):
                         result["outputTruncated"] = True
             except BaseException:
-                capture_failed = True
+                # A rethrown sink failure is not a failure of the pipe. Keep
+                # reads enabled for the bounded passive-discard path above.
+                if not sink_exception:
+                    pipe_failed = True
+                    result["outputPipeFailed"] = True
                 if not cleanup:
                     raise
-                result["errors"].append("Cleanup collector: " + traceback.format_exc(limit=10))
+                result["errors"].append("Cleanup pipe collector: " + traceback.format_exc(limit=10))
 
         def send_owned(sig):
             state = observe_group()
@@ -274,7 +351,9 @@ class Runner:
 
         try:
             result["resourceObservations"].append(resource_snapshot(self.work))
-            output = log.open("wb")
+            # Unbuffered output prevents close() retrying buffered writes after
+            # a failed sink; short writes are treated as evidence failures.
+            output = log.open("wb", buffering=0)
             gate_read, gate_write = os.pipe()
             if environment and environment.get("FIELDLOG_TRANSPORT_CONFIG"):
                 environment = environment.copy()
@@ -308,6 +387,7 @@ class Runner:
             if custody is not None:
                 custody.start(group)
             selector.register(process.stdout, selectors.EVENT_READ)
+            pipe_registered = True
             if absolute_deadline is not None and time.monotonic() >= absolute_deadline:
                 raise VerificationFailure("Shared phase deadline exhausted before command admission")
             os.write(gate_write, b"G")
@@ -400,6 +480,16 @@ class Runner:
             except BaseException:
                 result["errors"].append("Cleanup: " + traceback.format_exc(limit=20))
             finally:
+                # Group ambiguity or an evidence failure cannot authorize a
+                # signal, but also must not bypass the existing direct-child
+                # reap and owned-pipe accounting. No group probes occur here.
+                passive_deadline = min(cleanup_deadline, time.monotonic() + PASSIVE_CLEANUP_SECONDS)
+                try:
+                    while process is not None and time.monotonic() < passive_deadline and not (result["childReaped"] and result["pipeEOF"]):
+                        drain(min(0.05, max(0, passive_deadline - time.monotonic())), cleanup=True)
+                        reap()
+                except BaseException:
+                    result["errors"].append("Passive cleanup: " + traceback.format_exc(limit=10))
                 reap()
                 closers = [("selector", selector.close)]
                 if process is not None and process.stdout is not None:
@@ -537,7 +627,8 @@ class Runner:
             "sdkRevision": PUBLIC_PIN, "sdkTree": EXPECTED_SDK_TREE,
             "bounds": {"publicAcquisitionSeconds": 180, "ownedGitLogicalBytesSampled": TRANSPORT.STORAGE_LIMIT,
                 "sampleIntervalSeconds": TRANSPORT.SAMPLE_SECONDS, "sampledThresholdMayOvershoot": True,
-                "packageLogicalBytes": 1048576, "innerAggregateCapturedOutputBytes": TRANSPORT.OUTPUT_LIMIT,
+                "packageLogicalBytes": 1048576, "innerAggregateCapturedOutputBytes": TRANSPORT.INNER_AGGREGATE_OUTPUT_LIMIT,
+                "innerPerCommandCapturedOutputBytes": TRANSPORT.OUTPUT_LIMIT,
                 "outerAggregateCapturedOutputBytes": OUTPUT_LIMIT, "events": 8192,
                 "repositoryClones": 1, "checkoutClones": 3},
             "processCustody": "Git children inherit an outer or explicitly registered SwiftPM adapter group; adapter never changes group/session; outer Runner owns final cleanup",
