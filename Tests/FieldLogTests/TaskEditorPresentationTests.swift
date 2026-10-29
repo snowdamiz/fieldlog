@@ -7,14 +7,17 @@ import FieldLogFeatures
 
 private actor PresentationSaveGate {
   private(set) var calls: [(String, String)] = []
+  private(set) var completedWhileCancelled: [Bool] = []
   private var continuation: CheckedContinuation<TaskSaveResult, Never>?
   private var admission: CheckedContinuation<Void, Never>?
   func save(_ title: String, _ responsible: String) async -> TaskSaveResult {
     calls.append((title, responsible))
-    return await withCheckedContinuation {
+    let result: TaskSaveResult = await withCheckedContinuation {
       continuation = $0
       admission?.resume(); admission = nil
     }
+    completedWhileCancelled.append(Task.isCancelled)
+    return result
   }
   func waitForAdmission() async {
     if continuation != nil { return }
@@ -171,10 +174,25 @@ private func node(_ snapshot: TaskEditorPresentationSnapshot, _ id: String) -> U
   try form.send(nodeID: "task.title", event: .textChange, value: .string("Late result"))
   try form.send(nodeID: "task.save", event: .activate)
   await gate.waitForAdmission()
+  // Both tasks are MainActor-isolated. The parent resumes only after this
+  // waiter has captured the currently owned effect and suspended on its value.
+  var completionFinished = false
+  var completion: Task<Void, Never>?
+  await withCheckedContinuation { (started: CheckedContinuation<Void, Never>) in
+    completion = Task { @MainActor in
+      started.resume()
+      await form.waitForSave()
+      completionFinished = true
+    }
+  }
+  let saveCompletion = try #require(completion)
+  #expect(!completionFinished)
   try form.close()
   let closed = form.snapshot
   await gate.finish(.saved)
-  await Task.yield()
+  await saveCompletion.value
+  #expect(completionFinished)
+  #expect(await gate.completedWhileCancelled == [true])
   #expect(form.snapshot.outcome == .closed && !form.snapshot.state.saved)
   #expect(form.snapshot.state == closed.state && form.snapshot.navigation.routes.isEmpty)
   #expect(throws: TaskEditorPresentationError.closed) {

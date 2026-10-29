@@ -10,13 +10,16 @@ import FieldLogStorage
 
 private actor AppleFieldsSaveGate {
   private(set) var calls: [(String, String)] = []
+  private(set) var completedWhileCancelled: [Bool] = []
   private var continuation: CheckedContinuation<TaskSaveResult, Never>?
   private var admission: CheckedContinuation<Void, Never>?
   func save(_ title: String, _ responsible: String) async -> TaskSaveResult {
     calls.append((title, responsible))
-    return await withCheckedContinuation {
+    let result: TaskSaveResult = await withCheckedContinuation {
       continuation = $0; admission?.resume(); admission = nil
     }
+    completedWhileCancelled.append(Task.isCancelled)
+    return result
   }
   func waitForAdmission() async {
     if continuation != nil { return }
@@ -262,6 +265,79 @@ private func changingFields(_ document: MixerUI.UIDocument, _ change: (UINode) -
   try owner.close()
 }
 
+@Test @MainActor func appleFieldsFailedProjectionPreparationKeepsOwnershipVisibleValuesAndRejectsEffects() async throws {
+  let gate = AppleFieldsSaveGate()
+  let form = try TaskEditorPresentation { await gate.save($0, $1) }
+  var rejectProjection = false
+  var projected: [MixerUI.UIDocument] = []
+  var updated: [MixerUI.UIDocument] = []
+  let owner = try TaskEditorAppleFieldsHost(presentation: form, project: { document in
+    projected.append(document)
+    if rejectProjection { throw TaskEditorAppleFieldsError.projectionMismatch }
+    return try TaskEditorAppleFieldsHost.fieldsDocument(document)
+  }, update: { host, document in
+    updated.append(document)
+    _ = try host.update(document)
+  })
+  let installedTitle = "  Inspect 日本語\nopening 🧪  "
+  let responsible = "  Rae\n東京  "
+  try applyFieldsAction(owner, "task.title", installedTitle)
+  try applyFieldsAction(owner, "task.responsible", responsible)
+  #expect(!owner.inputUnavailable && owner.adapterFailure == nil)
+  let receipt = owner.installation
+  let native = owner.nativeHost.snapshot
+  let before = owner.snapshot
+  let preparedCount = projected.count, installedCount = updated.count
+  let retainedTitle = "  Keep 日本語\npreparation 🧪  "
+  rejectProjection = true
+  try applyFieldsAction(owner, "task.title", retainedTitle)
+
+  #expect(projected.count == preparedCount + 1 && projected.last == owner.snapshot.render.document)
+  #expect(updated.count == installedCount)
+  #expect(owner.snapshot.state.title == retainedTitle && owner.snapshot.state.responsible == responsible)
+  #expect(!owner.snapshot.state.saving && !owner.snapshot.state.saved && owner.snapshot.state.failure == nil)
+  #expect(owner.snapshot.state.canSubmit && owner.snapshot.outcome == .editing)
+  #expect(owner.snapshot.navigation == before.navigation && owner.snapshot.renderingFailure == nil)
+  #expect(owner.snapshot.render.document.revision == before.render.document.revision + 1)
+  let retained = try TaskEditorAppleFieldsHost.fieldsDocument(owner.snapshot.render.document)
+  #expect(retained.root.children[0].properties["value"]?.string == retainedTitle)
+  #expect(retained.root.children[1].properties["value"]?.string == responsible)
+  #expect(owner.adapterFailure != nil && owner.eventFailure == nil && owner.inputUnavailable && !owner.isClosed)
+  #expect(owner.ownerID == receipt.ownerID && owner.installation.ownerID == receipt.ownerID)
+  #expect(owner.installation.id == receipt.id)
+  #expect(owner.installation.source.document == receipt.source.document)
+  #expect(owner.installation.native.document == receipt.native.document)
+  #expect(owner.nativeHost.snapshot.document == native.document)
+  #expect(owner.nativeHost.snapshot.document.root.children[0].properties["value"]?.string == installedTitle)
+  #expect(owner.nativeHost.snapshot.document.root.children[1].properties["value"]?.string == responsible)
+  for nodeID in ["task.title", "task.responsible"] {
+    #expect(owner.installation.source.identity(for: nodeID) == receipt.source.identity(for: nodeID))
+    #expect(owner.installation.native.identity(for: nodeID) == receipt.native.identity(for: nodeID))
+    #expect(owner.nativeHost.snapshot.identity(for: nodeID) == native.identity(for: nodeID))
+  }
+  let failed = owner.snapshot
+  #expect(throws: TaskEditorAppleFieldsError.unavailable) {
+    try owner.accept(fieldsAction(owner, "task.title", "Rejected"), from: owner.nativeHost, installation: receipt)
+  }
+  for nodeID in ["task.save", "task.cancel"] {
+    #expect(throws: TaskEditorAppleFieldsError.unavailable) {
+      try owner.acceptNative(fieldsEvent(owner.snapshot.render, nodeID, .activate, .null))
+    }
+  }
+  await owner.waitForSave()
+  #expect(await gate.calls.isEmpty)
+  #expect(await gate.completedWhileCancelled.isEmpty)
+  #expect(projected.count == preparedCount + 1 && updated.count == installedCount)
+  #expect(owner.snapshot.state == failed.state && owner.snapshot.render.document == failed.render.document)
+  #expect(owner.snapshot.state.title == retainedTitle && owner.snapshot.state.responsible == responsible)
+  #expect(owner.snapshot.outcome == .editing && owner.snapshot.navigation == before.navigation)
+  try owner.close()
+  #expect(owner.isClosed && owner.inputUnavailable && owner.snapshot.outcome == .closed)
+  #expect(owner.snapshot.navigation.routes.isEmpty && !owner.snapshot.state.saved)
+  #expect(owner.snapshot.state.title == retainedTitle && owner.snapshot.state.responsible == responsible)
+  #expect(owner.installation.id == receipt.id && owner.nativeHost.snapshot.document == native.document)
+}
+
 @Test @MainActor func appleFieldsFailedUpdatePreservesInstalledPairRevokesAdmissionAndKeepsText() throws {
   let form = try TaskEditorPresentation { _, _ in .failed("Unused") }
   let owner = try TaskEditorAppleFieldsHost(presentation: form, update: { host, document in
@@ -332,10 +408,25 @@ private func changingFields(_ document: MixerUI.UIDocument, _ change: (UINode) -
   try applyFieldsAction(owner, "task.title", "Late save")
   try owner.acceptNative(fieldsEvent(owner.snapshot.render, "task.save", .activate, .null))
   await gate.waitForAdmission()
+  // Both tasks are MainActor-isolated. The parent resumes only after this
+  // waiter has captured the currently owned effect and suspended on its value.
+  var completionFinished = false
+  var completion: Task<Void, Never>?
+  await withCheckedContinuation { (started: CheckedContinuation<Void, Never>) in
+    completion = Task { @MainActor in
+      started.resume()
+      await owner.waitForSave()
+      completionFinished = true
+    }
+  }
+  let saveCompletion = try #require(completion)
+  #expect(!completionFinished)
   try owner.close()
   let closed = owner.snapshot
   await gate.finish(.saved)
-  await Task.yield()
+  await saveCompletion.value
+  #expect(completionFinished)
+  #expect(await gate.completedWhileCancelled == [true])
   #expect(owner.snapshot.outcome == .closed && !owner.snapshot.state.saved)
   #expect(owner.snapshot.state == closed.state && owner.snapshot.render.document == closed.render.document)
   #expect(owner.inputUnavailable)

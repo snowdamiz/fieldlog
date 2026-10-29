@@ -6,14 +6,17 @@ import FieldLogFeatures
 
 private actor SaveGate {
   var calls: [(String, String)] = []
+  private(set) var completedWhileCancelled: [Bool] = []
   private var continuation: CheckedContinuation<TaskSaveResult, Never>?
   private var admission: CheckedContinuation<Void, Never>?
   func save(_ title: String, _ responsible: String) async -> TaskSaveResult {
     calls.append((title, responsible))
-    return await withCheckedContinuation { continuation in
+    let result: TaskSaveResult = await withCheckedContinuation { continuation in
       self.continuation = continuation
       admission?.resume(); admission = nil
     }
+    completedWhileCancelled.append(Task.isCancelled)
+    return result
   }
   func waitForAdmission() async {
     if !calls.isEmpty { return }
@@ -62,12 +65,27 @@ private actor SaveGate {
   try editor.changeTitle("Late result")
   try editor.submit()
   await gate.waitForAdmission()
+  // Both tasks are MainActor-isolated. The parent resumes only after this
+  // waiter has captured the currently owned effect and suspended on its value.
+  var completionFinished = false
+  var completion: Task<Void, Never>?
+  await withCheckedContinuation { (started: CheckedContinuation<Void, Never>) in
+    completion = Task { @MainActor in
+      started.resume()
+      await editor.waitForSave()
+      completionFinished = true
+    }
+  }
+  let saveCompletion = try #require(completion)
+  #expect(!completionFinished)
   let beforeClose = editor.state
   try editor.close()
   await gate.finish(.saved)
   // The underlying operation deliberately ignores cancellation. Closing the
   // public Mixer owner rejects its result without claiming to undo persistence.
-  await Task.yield()
+  await saveCompletion.value
+  #expect(completionFinished)
+  #expect(await gate.completedWhileCancelled == [true])
   #expect(editor.state == beforeClose && !editor.state.saved)
   #expect(throws: (any Error).self) { try editor.submit() }
 }
