@@ -1,0 +1,52 @@
+dependencies:
+  - name: Official Swift compiler and standard library
+    origin: https://www.swift.org/
+    version: Apple Swift 6.4 swiftlang-6.4.0.34.1
+    license: Apache-2.0 with Runtime Library Exception
+    purpose: Original Swift models, storage, app compilation and tests
+    distribution_mode: Platform toolchain and standard runtime
+    owner: FieldLog native baseline
+  - name: Apple platform SDKs
+    origin: https://developer.apple.com/
+    version: Xcode 27.1 build 27A9275; iPhoneSimulator 27.1
+    license: Apple SDK agreement
+    purpose: Foundation, SwiftUI, UIKit, PhotosUI, CoreTransferable, ImageIO, native sharing
+    distribution_mode: System platform frameworks; no SDK redistribution
+    owner: FieldLog native baseline
+  - name: Python 3 standard library
+    origin: https://www.python.org/
+    version: Remote runner provisioned Python 3; actual sys.version recorded in each CI receipt
+    license: Python Software Foundation License
+    purpose: Bounded host CI collection, exact owned-child cleanup and source/pin evidence
+    distribution_mode: CI platform tool; no Python packages or runtime redistributed with the app
+    owner: FieldLog host development CI
+  - name: Git
+    origin: https://git-scm.com/
+    version: Remote runner provisioned Git; actual git --version recorded in each CI receipt
+    license: GPL-2.0
+    purpose: Exact public-commit depth-one mirror and app/dependency source identity
+    distribution_mode: CI platform tool; no Git binary redistributed with the app
+    owner: FieldLog host development CI
+  - name: GitHub Actions checkout and artifact upload
+    origin: https://github.com/actions
+    version: checkout 11d5960a326750d5838078e36cf38b85af677262; upload-artifact ea165f8d65b6e75b540449e92b4886f43607fa02
+    license: MIT
+    purpose: Separate app checkout and bounded development-evidence retention
+    distribution_mode: Hosted CI actions; no action runtime redistributed with the app
+    owner: FieldLog host development CI
+external_packages:
+  - name: MixerCore, MixerUI, MixerApple and MixerAndroid
+    origin: https://github.com/snowdamiz/mixer.git
+    revision: 8efc1a9e5b1602117f8211c95bfd4203cc91f689
+    purpose: Shared task and entry editor state, asynchronous save ownership, validated form documents, original event routing, navigation, public Apple fields and explicit Android V4 note rendering
+    distribution_mode: Pinned public Git source dependency; optional explicit local SDK for development
+    ownership: First-party independently authored Mixer code; no third-party engine
+    qualification: Development source consumption only. Immutable published packages, physical phones, D0-D8 and GA remain pending.
+provenance: Original app and tests independently authored; no competitor implementation or fixtures used.
+
+verification_tools:
+  - name: OpenJDK
+    origin: https://openjdk.org/
+    license: GPL-2.0 with Classpath Exception
+    purpose: Execute app-owned ReportFiles and root-alias behavior checks; no Android API stubs
+    distribution_mode: Local test tool, not redistributed with the app

@@ -1,0 +1,9 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="dev.fieldlog.generatedr90" android:versionCode="1" android:versionName="0.1.0">
+  <uses-sdk android:minSdkVersion="36" android:targetSdkVersion="37" />
+  <application android:theme="@android:style/Theme.Material.Light.NoActionBar" android:label="FieldLogGenerated" android:debuggable="true" android:allowBackup="false" android:extractNativeLibs="true" android:supportsRtl="true">
+    <provider android:name="dev.fieldlog.generatedr90.androidhost.PublicBridge$ReportProvider" android:authorities="dev.fieldlog.generatedr90.reports" android:exported="false" android:grantUriPermissions="true" />
+    <activity android:name="dev.fieldlog.generatedr90.androidhost.PublicActivity" android:exported="true" android:windowSoftInputMode="adjustResize">
+      <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
+    </activity>
+  </application>
+</manifest>
