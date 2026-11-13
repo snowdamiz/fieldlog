@@ -72,9 +72,15 @@ jobs:
         timeout-minutes: 2
         run: |
           set -euo pipefail
-          test "$RUNNER_OS/$RUNNER_ARCH" = macOS/X64
           test ! -e "$FIELDLOG_CI_ROOT"
           mkdir -p "$FIELDLOG_CI_ROOT/evidence" "$FIELDLOG_CI_ROOT/tmp" "$FIELDLOG_CI_ROOT/swift-sdks"
+          exec 3>&1
+          result=0
+          trap 'result=$?; set +x; tail -c 16384 "$FIELDLOG_CI_ROOT/evidence/prerequisites.log" >&3; exec 3>&-; exit "$result"' EXIT
+          exec > "$FIELDLOG_CI_ROOT/evidence/prerequisites.log" 2>&1
+          PS4='+ prerequisite ${LINENO}: '
+          set -x
+          test "$RUNNER_OS/$RUNNER_ARCH" = macOS/X64
           test "$(git -C .ci-mixer-cli rev-parse HEAD)" = "$MIXER_REVISION"
           test "$(git -C .ci-mixer-sdk rev-parse HEAD)" = 8efc1a9e5b1602117f8211c95bfd4203cc91f689
           test "$(xcodebuild -version)" = $'Xcode 26.6\nBuild version 17F113'
@@ -263,6 +269,10 @@ jobs:
           root = Path(os.environ['FIELDLOG_CI_ROOT'])
           evidence = root / 'evidence'
           evidence.mkdir(parents=True, exist_ok=True)
+          context = {'scope': 'development Android CI diagnostics; build qualification is separate',
+              'fieldlog_revision': os.environ['GITHUB_SHA'],
+              'run_id': os.environ['GITHUB_RUN_ID'], 'run_attempt': os.environ['GITHUB_RUN_ATTEMPT']}
+          (evidence / 'ci-context.json').write_text(json.dumps(context, indent=2) + '\n')
           logs = list(root.glob('FieldLogGenerated-logs-*/*.log'))
           for source in logs:
               target = evidence / 'failed-recipe' / source.parent.name / source.name
