@@ -30,11 +30,7 @@ jobs:
       TOOLCHAINS: com.apple.dt.toolchain.XcodeDefault
       PYTHONDONTWRITEBYTECODE: '1'
       PYTHONUNBUFFERED: '1'
-      FIELDLOG_CI_ROOT: ${{ runner.temp }}/fieldlog-generated-report-${{ github.run_id }}-${{ github.run_attempt }}
       FIELDLOG_MIXER_SDK: ${{ github.workspace }}/.ci-generated-report-sdk/sdk
-      FIELDLOG_WORKSPACE: ${{ runner.temp }}/fieldlog-generated-report-${{ github.run_id }}-${{ github.run_attempt }}/workspaces
-      CLANG_MODULE_CACHE_PATH: ${{ runner.temp }}/fieldlog-generated-report-${{ github.run_id }}-${{ github.run_attempt }}/clang-cache
-      SWIFTPM_MODULECACHE_OVERRIDE: ${{ runner.temp }}/fieldlog-generated-report-${{ github.run_id }}-${{ github.run_attempt }}/module-cache
     steps:
       - name: Check out FieldLog
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -57,6 +53,13 @@ jobs:
         timeout-minutes: 2
         run: |
           set -euo pipefail
+          export FIELDLOG_CI_ROOT="$RUNNER_TEMP/fieldlog-generated-report-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          export FIELDLOG_WORKSPACE="$FIELDLOG_CI_ROOT/workspaces"
+          export CLANG_MODULE_CACHE_PATH="$FIELDLOG_CI_ROOT/clang-cache"
+          export SWIFTPM_MODULECACHE_OVERRIDE="$FIELDLOG_CI_ROOT/module-cache"
+          for variable in FIELDLOG_CI_ROOT FIELDLOG_WORKSPACE CLANG_MODULE_CACHE_PATH SWIFTPM_MODULECACHE_OVERRIDE; do
+            printf '%s=%s\n' "$variable" "${!variable}" >> "$GITHUB_ENV"
+          done
           mkdir -p "$FIELDLOG_CI_ROOT/evidence" "$FIELDLOG_CI_ROOT/tmp" "$FIELDLOG_WORKSPACE"
           {
             test -d "$DEVELOPER_DIR/Toolchains/XcodeDefault.xctoolchain"
