@@ -1,0 +1,132 @@
+name: GeneratedReport host development
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'Integrations/GeneratedReport/**'
+      - '.github/workflows/generated-report-host.yml'
+  pull_request:
+    paths:
+      - 'Integrations/GeneratedReport/**'
+      - '.github/workflows/generated-report-host.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: generated-report-host-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  generated-report-host:
+    runs-on: macos-15
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
+      TOOLCHAINS: com.apple.dt.toolchain.XcodeDefault
+      PYTHONDONTWRITEBYTECODE: '1'
+      PYTHONUNBUFFERED: '1'
+      FIELDLOG_CI_ROOT: ${{ runner.temp }}/fieldlog-generated-report-${{ github.run_id }}-${{ github.run_attempt }}
+      FIELDLOG_MIXER_SDK: ${{ github.workspace }}/.ci-generated-report-sdk/sdk
+      FIELDLOG_WORKSPACE: ${{ runner.temp }}/fieldlog-generated-report-${{ github.run_id }}-${{ github.run_attempt }}/workspaces
+      CLANG_MODULE_CACHE_PATH: ${{ runner.temp }}/fieldlog-generated-report-${{ github.run_id }}-${{ github.run_attempt }}/clang-cache
+      SWIFTPM_MODULECACHE_OVERRIDE: ${{ runner.temp }}/fieldlog-generated-report-${{ github.run_id }}-${{ github.run_attempt }}/module-cache
+    steps:
+      - name: Check out FieldLog
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Check out only the pinned public Mixer SDK
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: snowdamiz/mixer
+          ref: 8efc1a9e5b1602117f8211c95bfd4203cc91f689
+          path: .ci-generated-report-sdk
+          sparse-checkout: sdk
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Record actual toolchain and source inputs
+        id: inputs
+        timeout-minutes: 2
+        run: |
+          set -euo pipefail
+          mkdir -p "$FIELDLOG_CI_ROOT/evidence" "$FIELDLOG_CI_ROOT/tmp" "$FIELDLOG_WORKSPACE"
+          {
+            test -d "$DEVELOPER_DIR/Toolchains/XcodeDefault.xctoolchain"
+            test -f "$FIELDLOG_MIXER_SDK/Package.swift"
+            test "$(git -C .ci-generated-report-sdk rev-parse HEAD)" = 8efc1a9e5b1602117f8211c95bfd4203cc91f689
+            git rev-parse HEAD
+            git -C .ci-generated-report-sdk rev-parse HEAD
+            sw_vers
+            xcodebuild -version
+            xcrun --find swift
+            swift --version
+            python3 --version
+            javac -version
+            java -version
+            python3 - <<'PY'
+          import hashlib, os
+          from pathlib import Path
+          sdk = Path(os.environ['FIELDLOG_MIXER_SDK'])
+          manifest = ''.join(f'{hashlib.sha256(p.read_bytes()).hexdigest()}  {p.relative_to(sdk).as_posix()}\n'
+                             for p in sorted(sdk.rglob('*')) if p.is_file())
+          evidence = Path(os.environ['FIELDLOG_CI_ROOT']) / 'evidence'
+          (evidence / 'sdk-files.sha256').write_text(manifest)
+          print('Public SDK manifest SHA-256:', hashlib.sha256(manifest.encode()).hexdigest())
+          print('Scope: development host only; immutable package, native, JNI, dogfood and GA pending')
+          PY
+          } 2>&1 | (ulimit -f 8192; exec tee "$FIELDLOG_CI_ROOT/evidence/inputs.log")
+
+      - name: Run GeneratedReport Swift host tests
+        timeout-minutes: 9
+        working-directory: Integrations/GeneratedReport
+        env:
+          TMPDIR: ${{ env.FIELDLOG_CI_ROOT }}/tmp
+        run: |
+          set -euo pipefail
+          swift test --package-path . --scratch-path "$FIELDLOG_CI_ROOT/swift-build" \
+            --cache-path "$FIELDLOG_CI_ROOT/swift-cache" --jobs 4 \
+            2>&1 | (ulimit -f 8192; exec tee "$FIELDLOG_CI_ROOT/evidence/swift-tests.log")
+
+      - name: Run real ReportRoot and ReportFiles JVM checks
+        if: ${{ !cancelled() && steps.inputs.outcome == 'success' }}
+        timeout-minutes: 2
+        working-directory: Integrations/GeneratedReport
+        run: |
+          set -euo pipefail
+          {
+            python3 scripts/prepare-report-files-tests.py --output "$FIELDLOG_CI_ROOT/java-source"
+            javac -encoding UTF-8 -d "$FIELDLOG_CI_ROOT/classes" \
+              "$FIELDLOG_CI_ROOT/java-source/PublicBridge.java" \
+              Platforms/Android/Java/dev/fieldlog/generatedr90/androidhost/ReportRoot.java \
+              Tests/ReportFilesJava/ReportFilesChecks.java
+            java -cp "$FIELDLOG_CI_ROOT/classes" \
+              dev.fieldlog.generatedr90.androidhost.ReportFilesChecks "$FIELDLOG_CI_ROOT/report-workspace"
+          } 2>&1 | (ulimit -f 8192; exec tee "$FIELDLOG_CI_ROOT/evidence/java-checks.log")
+
+      - name: Run recipe boundary controls
+        if: ${{ !cancelled() && steps.inputs.outcome == 'success' }}
+        timeout-minutes: 1
+        working-directory: Integrations/GeneratedReport
+        env:
+          TMPDIR: ${{ env.FIELDLOG_CI_ROOT }}/tmp
+        run: |
+          set -euo pipefail
+          python3 -B -m unittest discover -s Tests/Recipe -p 'test_*.py' -v \
+            2>&1 | (ulimit -f 8192; exec tee "$FIELDLOG_CI_ROOT/evidence/recipe-controls.log")
+
+      - name: Retain bounded development host evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: generated-report-host-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.FIELDLOG_CI_ROOT }}/evidence/
+          if-no-files-found: error
+          retention-days: 14
