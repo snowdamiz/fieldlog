@@ -6,10 +6,14 @@ on:
     paths:
       - 'Integrations/GeneratedReport/**'
       - '.github/workflows/generated-report-host.yml'
+      - '.github/workflows/generated-report-android.yml'
+      - '.github/scripts/check-workflow-contexts.rb'
   pull_request:
     paths:
       - 'Integrations/GeneratedReport/**'
       - '.github/workflows/generated-report-host.yml'
+      - '.github/workflows/generated-report-android.yml'
+      - '.github/scripts/check-workflow-contexts.rb'
 
 permissions:
   contents: read
@@ -37,6 +41,13 @@ jobs:
         with:
           fetch-depth: 1
           persist-credentials: false
+
+      - name: Check workflow environment contexts
+        timeout-minutes: 1
+        run: |
+          set -euo pipefail
+          ruby .github/scripts/check-workflow-contexts.rb --self-test
+          ruby .github/scripts/check-workflow-contexts.rb
 
       - name: Check out only the pinned public Mixer SDK
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262

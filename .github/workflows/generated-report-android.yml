@@ -26,8 +26,13 @@ jobs:
       PYTHONDONTWRITEBYTECODE: '1'
       PYTHONUNBUFFERED: '1'
       MIXER_REVISION: a63f5cd2867b0b7d2668dbb1c93e28cd8f07c44b
-      FIELDLOG_CI_ROOT: ${{ runner.temp }}/fieldlog-android-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
+      - name: Initialize the Android CI runtime path
+        run: |
+          set -euo pipefail
+          FIELDLOG_CI_ROOT="$RUNNER_TEMP/fieldlog-android-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          printf 'FIELDLOG_CI_ROOT=%s\n' "$FIELDLOG_CI_ROOT" >> "$GITHUB_ENV"
+
       - name: Check out FieldLog
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
