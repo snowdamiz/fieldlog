@@ -42,3 +42,26 @@ Run the recipe boundary controls without native tools:
 ```sh
 python3 -m unittest discover -s Tests/Recipe -p 'test_*.py'
 ```
+
+## Build the public Android recipe on GitHub
+
+The `GeneratedReport Android public recipe` workflow runs the actual unsigned APK recipe on `macos-26-intel`. A push that changes this integration or its Android workflow starts a build. Inspect that run before dispatching another:
+
+```sh
+gh run list --repo snowdamiz/fieldlog --workflow generated-report-android.yml --branch main --limit 5
+gh run view RUN_ID --repo snowdamiz/fieldlog
+```
+
+To request a separate build of published `main`, use:
+
+```sh
+gh workflow run generated-report-android.yml --repo snowdamiz/fieldlog --ref main
+```
+
+The workflow checks out public Mixer revision `a63f5cd2867b0b7d2668dbb1c93e28cd8f07c44b` for the complete CLI, SDK, and updates package closure and the Pair21 Android adapter. It verifies the 119 source inputs against digest `80754549d262f01c49d2759e61b04d7581d1f63832d5a98bb558fe84a180185c`. The app's separate Swift SDK checkout remains pinned to `8efc1a9e5b1602117f8211c95bfd4203cc91f689`.
+
+The cross toolchain is the official Swift 6.3.3 macOS package and matching Android Swift SDK. The workflow verifies the package's macOS trust report and published SDK checksum. It requires Xcode 26.6 build 17F113, macOS SDK 26.5, image JDK 25.0.4, Android platform 37.0 revision 2, build-tools 37.0.0, and NDK r27d `27.3.13750724`. These explicit checks fail if an image update removes a prerequisite. The [GitHub runner inventory](https://github.com/actions/runner-images/blob/main/images/macos/macos-26-Readme.md) lists the image inputs. The [Swift package instructions](https://www.swift.org/install/macos/package_installer/) describe its signing identity.
+
+Download the `generated-report-android-COMMIT-RUN_ID-ATTEMPT` artifact after the run. It contains `FieldLogGenerated-unsigned.apk`, `FieldLog-source.zip` for the exact FieldLog commit, source identities, `mixer.lock`, the Android build receipt, and command logs. `provenance.json` binds the successful outputs by SHA-256. Builds use isolated runner scratch, a 45-minute job limit, bounded diagnostics, and seven-day artifact retention.
+
+This hosted build provides development evidence. Immutable published-package consumption, signing, installation, store, physical-device, and final GA qualification remain pending.

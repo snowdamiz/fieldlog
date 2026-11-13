@@ -1,0 +1,286 @@
+name: GeneratedReport Android public recipe
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'Integrations/GeneratedReport/**'
+      - '.github/workflows/generated-report-android.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: generated-report-android-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  public-recipe:
+    runs-on: macos-26-intel
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+      PYTHONDONTWRITEBYTECODE: '1'
+      PYTHONUNBUFFERED: '1'
+      MIXER_REVISION: a63f5cd2867b0b7d2668dbb1c93e28cd8f07c44b
+      FIELDLOG_CI_ROOT: ${{ runner.temp }}/fieldlog-android-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - name: Check out FieldLog
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Check out the pinned public CLI and its complete package closure
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: snowdamiz/mixer
+          ref: a63f5cd2867b0b7d2668dbb1c93e28cd8f07c44b
+          path: .ci-mixer-cli
+          fetch-depth: 1
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /cli/
+            /sdk/
+            /updates/
+            /native/android/
+            /scripts/ci/check-android-generated-java.py
+            /scripts/ci/check-android-binding.py
+            /verification/plan-continuation-2026-11-07/source113-inspection-caller-r3/current-source-inputs.json
+            /verification/plan-continuation-2026-11-07/generated-java-ci-integration/bootstrap.py
+
+      - name: Check out the unchanged public Swift SDK pin
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: snowdamiz/mixer
+          ref: 8efc1a9e5b1602117f8211c95bfd4203cc91f689
+          path: .ci-mixer-sdk
+          sparse-checkout: sdk
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Admit source and installed platform prerequisites
+        timeout-minutes: 2
+        run: |
+          set -euo pipefail
+          test "$RUNNER_OS/$RUNNER_ARCH" = macOS/X64
+          test ! -e "$FIELDLOG_CI_ROOT"
+          mkdir -p "$FIELDLOG_CI_ROOT/evidence" "$FIELDLOG_CI_ROOT/tmp" "$FIELDLOG_CI_ROOT/swift-sdks"
+          test "$(git -C .ci-mixer-cli rev-parse HEAD)" = "$MIXER_REVISION"
+          test "$(git -C .ci-mixer-sdk rev-parse HEAD)" = 8efc1a9e5b1602117f8211c95bfd4203cc91f689
+          test "$(xcodebuild -version)" = $'Xcode 26.6\nBuild version 17F113'
+          test "$(xcrun --sdk macosx --show-sdk-version)" = 26.5
+          : "${JAVA_HOME_25_X64:?Image JDK 25 is required}"
+          : "${ANDROID_HOME:?Image Android SDK is required}"
+          test "$("$JAVA_HOME_25_X64/bin/javac" --version)" = 'javac 25.0.4'
+          export MIXER_JDK="$JAVA_HOME_25_X64"
+          export MIXER_SWIFT="$FIELDLOG_CI_ROOT/swift.xctoolchain/usr/bin/swift"
+          export MIXER_SWIFT_SDKS_PATH="$FIELDLOG_CI_ROOT/swift-sdks"
+          export MIXER_ANDROID_ARTIFACT_PATH="$MIXER_SWIFT_SDKS_PATH/swift-6.3.3-RELEASE_android.artifactbundle/swift-android"
+          export ANDROID_NDK_HOME="$MIXER_ANDROID_ARTIFACT_PATH/android-ndk-r27d"
+          export FIELDLOG_OUTPUT="$FIELDLOG_CI_ROOT/FieldLogGenerated"
+          for variable in MIXER_JDK MIXER_SWIFT MIXER_SWIFT_SDKS_PATH MIXER_ANDROID_ARTIFACT_PATH ANDROID_NDK_HOME FIELDLOG_OUTPUT; do
+            printf '%s=%s\n' "$variable" "${!variable}" >> "$GITHUB_ENV"
+          done
+          python3 - <<'PY'
+          import hashlib, json, os, shutil
+          from pathlib import Path
+          root = Path('.ci-mixer-cli')
+          manifest = json.loads((root / 'verification/plan-continuation-2026-11-07/source113-inspection-caller-r3/current-source-inputs.json').read_text())
+          assert len(manifest) == 119
+          for name, expected in manifest.items():
+              data = (root / name).read_bytes()
+              assert len(data) == expected['bytes'] and hashlib.sha256(data).hexdigest() == expected['sha256'], name
+          digest = hashlib.sha256(''.join(p + '\0' + v['sha256'] + '\n' for p, v in sorted(manifest.items())).encode()).hexdigest()
+          assert digest == '80754549d262f01c49d2759e61b04d7581d1f63832d5a98bb558fe84a180185c'
+          android = Path(os.environ['ANDROID_HOME'])
+          for path, line in [
+              ('ndk/27.3.13750724/source.properties', 'Pkg.Revision = 27.3.13750724'),
+              ('build-tools/37.0.0/source.properties', 'Pkg.Revision=37.0.0'),
+              ('platforms/android-37.0/source.properties', 'Pkg.Revision=2')]:
+              lines = [''.join(s.split()) for s in (android / path).read_text().splitlines()]
+              assert ''.join(line.split()) in lines, path
+          assert (android / 'platforms/android-37.0/android.jar').is_file()
+          assert shutil.disk_usage(os.environ['FIELDLOG_CI_ROOT']).free >= 12 * 1024**3, 'Need 12 GiB free; preserve shared image tools'
+          evidence = Path(os.environ['FIELDLOG_CI_ROOT']) / 'evidence'
+          (evidence / 'cli119-source-inputs.json').write_text(json.dumps(manifest, indent=2) + '\n')
+          PY
+          {
+            git rev-parse HEAD
+            git -C .ci-mixer-cli rev-parse HEAD
+            git -C .ci-mixer-sdk rev-parse HEAD
+            printf 'ImageOS=%s\nImageVersion=%s\n' "${ImageOS:?Runner image identity is required}" "${ImageVersion:?Runner image identity is required}"
+            sw_vers
+            xcodebuild -version
+            python3 --version
+            "$MIXER_JDK/bin/java" --version
+            cat "$MIXER_JDK/release"
+          } > "$FIELDLOG_CI_ROOT/evidence/inputs.log" 2>&1
+
+      - name: Acquire the matching official Swift 6.3.3 toolchain and Android SDK
+        timeout-minutes: 15
+        run: |
+          set -euo pipefail
+          unset TOOLCHAINS SWIFT_EXEC SDKROOT
+          export TMPDIR="$FIELDLOG_CI_ROOT/tmp/"
+          host_url=https://download.swift.org/swift-6.3.3-release/xcode/swift-6.3.3-RELEASE/swift-6.3.3-RELEASE-osx.pkg
+          sdk_url=https://download.swift.org/swift-6.3.3-release/android-sdk/swift-6.3.3-RELEASE/swift-6.3.3-RELEASE_android.artifactbundle.tar.gz
+          curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' --connect-timeout 20 --max-time 300 --max-filesize 1503529808 --output "$FIELDLOG_CI_ROOT/swift.pkg" "$host_url"
+          test "$(stat -f %z "$FIELDLOG_CI_ROOT/swift.pkg")" = 1503529808
+          pkgutil --check-signature "$FIELDLOG_CI_ROOT/swift.pkg" > "$FIELDLOG_CI_ROOT/evidence/swift-package-trust.log" 2>&1
+          python3 - <<'PY'
+          import importlib.util, os
+          from pathlib import Path
+          source = Path('.ci-mixer-cli/verification/plan-continuation-2026-11-07/generated-java-ci-integration/bootstrap.py')
+          spec = importlib.util.spec_from_file_location('pinned_swift_package_trust', source)
+          module = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(module)
+          module.validate_host_signature((Path(os.environ['FIELDLOG_CI_ROOT']) / 'evidence/swift-package-trust.log').read_text())
+          PY
+          shasum -a 256 "$FIELDLOG_CI_ROOT/swift.pkg" > "$FIELDLOG_CI_ROOT/evidence/swift-package.sha256"
+          pkgutil --expand "$FIELDLOG_CI_ROOT/swift.pkg" "$FIELDLOG_CI_ROOT/expanded"
+          payload="$FIELDLOG_CI_ROOT/expanded/Payload"
+          if test ! -f "$payload"; then
+            payload="$FIELDLOG_CI_ROOT/expanded/swift-6.3.3-RELEASE-osx-package.pkg/Payload"
+          fi
+          test -f "$payload"
+          mkdir "$FIELDLOG_CI_ROOT/swift.xctoolchain"
+          tar -xf "$payload" -C "$FIELDLOG_CI_ROOT/swift.xctoolchain"
+          rm "$FIELDLOG_CI_ROOT/swift.pkg"
+          rm -r "$FIELDLOG_CI_ROOT/expanded"
+          curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' --connect-timeout 20 --max-time 300 --max-filesize 333223533 --output "$FIELDLOG_CI_ROOT/android.tar.gz" "$sdk_url"
+          test "$(stat -f %z "$FIELDLOG_CI_ROOT/android.tar.gz")" = 333223533
+          printf '%s  %s\n' d160cc3206dd1886dae3fef2337af5e25ec034692cd0ec225721c56cc69da7f5 "$FIELDLOG_CI_ROOT/android.tar.gz" > "$FIELDLOG_CI_ROOT/evidence/swift-android.sha256"
+          shasum -a 256 --check "$FIELDLOG_CI_ROOT/evidence/swift-android.sha256"
+          tar -xzf "$FIELDLOG_CI_ROOT/android.tar.gz" -C "$MIXER_SWIFT_SDKS_PATH"
+          rm "$FIELDLOG_CI_ROOT/android.tar.gz"
+          ditto "$ANDROID_HOME/ndk/27.3.13750724" "$ANDROID_NDK_HOME"
+          export SWIFT_ANDROID_NDK_LINK=1
+          cd "$MIXER_ANDROID_ARTIFACT_PATH"
+          bash scripts/setup-android-sdk.sh > "$FIELDLOG_CI_ROOT/evidence/sdk-setup.log" 2>&1
+          "$MIXER_SWIFT" --version > "$FIELDLOG_CI_ROOT/evidence/swift-version.log" 2>&1
+          "$MIXER_SWIFT" sdk list --swift-sdks-path "$MIXER_SWIFT_SDKS_PATH" > "$FIELDLOG_CI_ROOT/evidence/swift-sdks.log" 2>&1
+
+      - name: Build the actual public CLI with locked SwiftPM dependencies
+        timeout-minutes: 15
+        run: |
+          set -euo pipefail
+          unset TOOLCHAINS SWIFT_EXEC SDKROOT
+          export TMPDIR="$FIELDLOG_CI_ROOT/tmp/"
+          export CLANG_MODULE_CACHE_PATH="$FIELDLOG_CI_ROOT/clang-cache"
+          export SWIFTPM_MODULECACHE_OVERRIDE="$FIELDLOG_CI_ROOT/module-cache"
+          if "$MIXER_SWIFT" build --package-path .ci-mixer-cli/cli --scratch-path "$FIELDLOG_CI_ROOT/cli-build" --cache-path "$FIELDLOG_CI_ROOT/cli-cache" --force-resolved-versions -c release --product mixer --jobs 4 > "$FIELDLOG_CI_ROOT/evidence/cli-build.log" 2>&1; then
+            :
+          else
+            result=$?
+            tail -c 16384 "$FIELDLOG_CI_ROOT/evidence/cli-build.log"
+            exit "$result"
+          fi
+          cli_bin=$("$MIXER_SWIFT" build --package-path .ci-mixer-cli/cli --scratch-path "$FIELDLOG_CI_ROOT/cli-build" --cache-path "$FIELDLOG_CI_ROOT/cli-cache" --force-resolved-versions -c release --show-bin-path)
+          test -x "$cli_bin/mixer"
+          printf 'FIELDLOG_MIXER=%s/mixer\n' "$cli_bin" >> "$GITHUB_ENV"
+          cp .ci-mixer-cli/cli/Package.resolved "$FIELDLOG_CI_ROOT/evidence/cli-Package.resolved"
+          shasum -a 256 "$cli_bin/mixer" > "$FIELDLOG_CI_ROOT/evidence/mixer-executable.sha256"
+
+      - name: Run FieldLog's actual public Android recipe
+        timeout-minutes: 12
+        run: |
+          set -euo pipefail
+          unset TOOLCHAINS SWIFT_EXEC SDKROOT
+          export TMPDIR="$FIELDLOG_CI_ROOT/tmp/"
+          export CLANG_MODULE_CACHE_PATH="$FIELDLOG_CI_ROOT/clang-cache"
+          export SWIFTPM_MODULECACHE_OVERRIDE="$FIELDLOG_CI_ROOT/module-cache"
+          if python3 -B Integrations/GeneratedReport/scripts/build-android.py --mixer "$FIELDLOG_MIXER" --sdk-checkout "$GITHUB_WORKSPACE/.ci-mixer-sdk" --android-adapter-path "$GITHUB_WORKSPACE/.ci-mixer-cli/native/android" --output "$FIELDLOG_OUTPUT" > "$FIELDLOG_CI_ROOT/evidence/public-recipe.log" 2>&1; then
+            :
+          else
+            result=$?
+            tail -c 16384 "$FIELDLOG_CI_ROOT/evidence/public-recipe.log"
+            exit "$result"
+          fi
+
+      - name: Export the exact unsigned APK, source ZIP, and provenance
+        timeout-minutes: 2
+        run: |
+          set -euo pipefail
+          evidence="$FIELDLOG_CI_ROOT/evidence"
+          cp "$FIELDLOG_OUTPUT/.mixer/android-build/FieldLogGenerated-unsigned.apk" "$evidence/FieldLogGenerated-unsigned.apk"
+          cp "$FIELDLOG_OUTPUT/.mixer/android-build/build-receipt.json" "$evidence/build-receipt.json"
+          cp "$FIELDLOG_OUTPUT/.mixer/android-build/build-input.json" "$evidence/build-input.json"
+          cp "$FIELDLOG_OUTPUT/mixer.lock" "$evidence/mixer.lock"
+          cp -R "$FIELDLOG_OUTPUT/.fieldlog-build" "$evidence/recipe-commands"
+          git archive --format=zip --output "$evidence/FieldLog-source.zip" HEAD
+          git ls-tree -r HEAD > "$evidence/fieldlog-source-tree.txt"
+          python3 - <<'PY'
+          import hashlib, json, os, zipfile
+          from pathlib import Path
+          evidence = Path(os.environ['FIELDLOG_CI_ROOT']) / 'evidence'
+          lock = json.loads((evidence / 'mixer.lock').read_text())
+          assert lock['android']['profile']['id'] == 'mixer.android-source-pair.21'
+          assert lock['android']['profile']['adapter_compatibility_sha256'] == 'a076078c052649b425c1d6eff4103f35561e06caf7a316f58f6bf06a52377452'
+          with zipfile.ZipFile(evidence / 'FieldLogGenerated-unsigned.apk') as apk:
+              assert not any(p.upper().startswith('META-INF/') for p in apk.namelist()), 'Unexpected APK signature member'
+              assert apk.testzip() is None
+          receipt = json.loads((evidence / 'build-receipt.json').read_text())
+          assert receipt['toolchain'] == lock['android']['toolchain']
+          assert receipt['source_tree_sha256'] == receipt['source_tree_after_sha256']
+          assert receipt['apk_sha256'] == hashlib.sha256((evidence / 'FieldLogGenerated-unsigned.apk').read_bytes()).hexdigest()
+          files = {}
+          for p in sorted(evidence.rglob('*')):
+              if not p.is_file():
+                  continue
+              size = p.stat().st_size
+              assert size <= (64 * 1024**2 if p.suffix == '.apk' else 8 * 1024**2), str(p)
+              files[p.relative_to(evidence).as_posix()] = {'bytes': size, 'sha256': hashlib.sha256(p.read_bytes()).hexdigest()}
+          assert sum(v['bytes'] for v in files.values()) <= 100 * 1024**2
+          provenance = {'qualification': 'development unsigned Android public-recipe build',
+              'fieldlog_revision': os.environ['GITHUB_SHA'], 'mixer_revision': os.environ['MIXER_REVISION'],
+              'swift_sdk_revision': '8efc1a9e5b1602117f8211c95bfd4203cc91f689',
+              'CLI119_source_sha256': '80754549d262f01c49d2759e61b04d7581d1f63832d5a98bb558fe84a180185c',
+              'run_id': os.environ['GITHUB_RUN_ID'], 'run_attempt': os.environ['GITHUB_RUN_ATTEMPT'],
+              'files': files, 'signing_store_immutable_packages_devices_GA': 'pending'}
+          (evidence / 'provenance.json').write_text(json.dumps(provenance, indent=2) + '\n')
+          print('Unsigned APK and exact FieldLog source ZIP exported; development acceptance only.')
+          PY
+
+      - name: Collect and bound diagnostics, including failed recipe output
+        id: artifact_limits
+        if: always()
+        timeout-minutes: 1
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          root = Path(os.environ['FIELDLOG_CI_ROOT'])
+          evidence = root / 'evidence'
+          evidence.mkdir(parents=True, exist_ok=True)
+          logs = list(root.glob('FieldLogGenerated-logs-*/*.log'))
+          for source in logs:
+              target = evidence / 'failed-recipe' / source.parent.name / source.name
+              target.parent.mkdir(parents=True, exist_ok=True)
+              with source.open('rb') as raw:
+                  target.write_bytes(raw.read(8 * 1024**2))
+              if source.stat().st_size > target.stat().st_size:
+                  target.with_suffix('.truncated.json').write_text(json.dumps({'original_bytes': source.stat().st_size, 'retained_bytes': target.stat().st_size}) + '\n')
+          total = 0
+          for p in evidence.rglob('*'):
+              if p.is_file():
+                  size = p.stat().st_size
+                  assert size <= (64 * 1024**2 if p.suffix == '.apk' else 8 * 1024**2), str(p)
+                  total += size
+          assert total <= 100 * 1024**2, 'Artifact exceeds 100 MiB; preserve runner scratch'
+          print('Artifact bytes:', total)
+          PY
+
+      - name: Retain bounded build outputs and diagnostics
+        if: ${{ always() && steps.artifact_limits.outcome == 'success' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: generated-report-android-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.FIELDLOG_CI_ROOT }}/evidence/
+          if-no-files-found: error
+          retention-days: 7
