@@ -298,4 +298,12 @@ static final class ReportIntent {
     }
 }
 
+/** Canonicalize the trusted Context root before crossing the Swift boundary. */
+static final class ReportRoot {
+    private ReportRoot() {}
+    static File canonical(File files) throws IOException {
+        return files.getCanonicalFile();
+    }
+}
+
 }

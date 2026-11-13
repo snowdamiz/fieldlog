@@ -24,8 +24,8 @@ public final class ReportFilesChecks {
         byte[] bytes = "Actual saved report 👩🏽‍🔬\nNo upload\n".getBytes(java.nio.charset.StandardCharsets.UTF_8);
         Path report = Files.write(exports.resolve(name), bytes);
         File cache = root.resolve("cache").toFile();
-        check("trusted root alias canonicalized before Swift", () -> require(ReportRoot.canonical(alias.toFile()).equals(files.toFile())));
-        check("canonical root stable", () -> require(ReportRoot.canonical(files.toFile()).equals(files.toFile())));
+        check("trusted root alias canonicalized before Swift", () -> require(PublicBridge.ReportRoot.canonical(alias.toFile()).equals(files.toFile())));
+        check("canonical root stable", () -> require(PublicBridge.ReportRoot.canonical(files.toFile()).equals(files.toFile())));
         check("canonical report accepted through trusted alias", () -> require(PublicBridge.ReportFiles.source(alias.toFile(), report.toString(), bytes.length).equals(report.toFile())));
         check("noncanonical report path refused", () -> refused(() -> PublicBridge.ReportFiles.source(alias.toFile(), alias.resolve("FieldLog/exports").resolve(name).toString(), bytes.length)));
         check("wrong size refused", () -> refused(() -> PublicBridge.ReportFiles.source(files.toFile(), report.toString(), bytes.length+1)));

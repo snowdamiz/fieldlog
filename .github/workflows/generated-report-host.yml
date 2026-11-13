@@ -108,7 +108,6 @@ jobs:
             python3 scripts/prepare-report-files-tests.py --output "$FIELDLOG_CI_ROOT/java-source"
             javac -encoding UTF-8 -d "$FIELDLOG_CI_ROOT/classes" \
               "$FIELDLOG_CI_ROOT/java-source/PublicBridge.java" \
-              Platforms/Android/Java/dev/fieldlog/generatedr90/androidhost/ReportRoot.java \
               Tests/ReportFilesJava/ReportFilesChecks.java
             java -cp "$FIELDLOG_CI_ROOT/classes" \
               dev.fieldlog.generatedr90.androidhost.ReportFilesChecks "$FIELDLOG_CI_ROOT/report-workspace"

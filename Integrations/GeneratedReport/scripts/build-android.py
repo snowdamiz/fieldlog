@@ -24,7 +24,7 @@ def app_inputs():
              (platform / "Bridge/PublicBridge.c", Path("Platforms/Android/Bridge/PublicBridge.c"))]
     java = Path("Java/dev/fieldlog/generatedr90/androidhost")
     files += [(platform / java / name, Path("Platforms/Android") / java / name)
-              for name in ("PublicBridge.java", "PublicActivity.java", "ReportRoot.java")]
+              for name in ("PublicBridge.java", "PublicActivity.java")]
     files += [(APP / "Sources/FieldLogAndroid" / name,
                Path("Platforms/Android/Sources/AppAndroid") / name)
               for name in ("NativeEntry.swift", "PublicFactory.swift")]

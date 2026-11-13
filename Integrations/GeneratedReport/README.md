@@ -2,7 +2,7 @@
 
 This additive development package preserves the ordinary FieldLog app and its original package, lock files, iOS sources, tests, workflow, and behavior. The baseline repository has no Android host or shared EntryEditor and lacks the attachPhoto storage method required by the tested generated app. This package keeps that app as a separate integration rather than replacing those original targets.
 
-Sources and host tests come from the accepted R992 source ZIP (SHA-256 b9b725460ccb69e78cc4962217b089ebc323ce2fc3244f48a451a38fcdeb472b). PublicActivity and PublicBridge incorporate the independently reviewed R1702 report fix. ReportRoot exposes the same trusted-root canonicalization for ordinary JVM testing. ReportFiles, ReportIntent, the source descriptor checks, strict child no-follow checks, and fixed-stage diagnostics remain unchanged. NativeRendererSDK is supplied by Mixer and is never copied into this app.
+Sources and host tests come from the accepted R992 source ZIP (SHA-256 b9b725460ccb69e78cc4962217b089ebc323ce2fc3244f48a451a38fcdeb472b). PublicActivity and PublicBridge incorporate the independently reviewed R1702 report fix. The package-private ReportRoot class at the end of PublicBridge.java preserves trusted-root canonicalization and the two-file public Android host source inventory. ReportFiles, ReportIntent, the source descriptor checks, strict child no-follow checks, and fixed-stage diagnostics remain unchanged. NativeRendererSDK is supplied by Mixer and is never copied into this app.
 
 The public Mixer development pin is 8efc1a9e5b1602117f8211c95bfd4203cc91f689. Supply its SDK directory explicitly for local development; no engine internals or substitute APIs are used:
 
@@ -14,13 +14,12 @@ swift test --package-path . --scratch-path /absolute/owned-scratch/swift-build \
   --cache-path /absolute/owned-scratch/swift-cache --jobs 4
 ```
 
-For JVM checks, use a fresh output and workspace. The preparation script copies the exact nested ReportFiles body from the real bridge into a Java-only compilation unit. It supplies standard JDK imports, with no Android mocks or handmade API stubs:
+For JVM checks, use a fresh output and workspace. The preparation script copies the exact nested ReportFiles and nested ReportRoot bodies from the production bridge into one Java-only compilation unit and records both body SHA-256 values. It supplies standard JDK imports, with no Android mocks or handmade API stubs:
 
 ```sh
 python3 scripts/prepare-report-files-tests.py --output /absolute/owned-scratch/java-source
 javac -encoding UTF-8 -d /absolute/owned-scratch/classes \
   /absolute/owned-scratch/java-source/PublicBridge.java \
-  Platforms/Android/Java/dev/fieldlog/generatedr90/androidhost/ReportRoot.java \
   Tests/ReportFilesJava/ReportFilesChecks.java
 java -cp /absolute/owned-scratch/classes \
   dev.fieldlog.generatedr90.androidhost.ReportFilesChecks /absolute/owned-scratch/report-workspace
